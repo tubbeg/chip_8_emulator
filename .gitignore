@@ -1,2 +1,3 @@
 *.txt
 *.ch8
+__pycache__/
