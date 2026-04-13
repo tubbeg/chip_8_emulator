@@ -41,28 +41,72 @@ class Word():
 class Memory():
     def __init__(self, ba) -> None:
         self._memory = bytearray(ba)
-    def try_get_opcode(self,pc):
+    def try_get_index_memory(self, index, rows):
         try:
-            high = self._memory[pc]
-            low = self._memory[pc + 1]
-            return (high,low)
+            #width = 8
+            result = []
+            for j in range(0,rows):
+                byte = self._memory[index + j]
+                result.append(byte)
+            return result
         except:
             return None
+    def try_get_opcode_memory(self,pc):
+        high = self._memory[pc]
+        print(high)
+        low = self._memory[pc + 1]
+        print(low)
+        return (high,low)
+
+def init_screen() : return [[False for _ in range(0,64)] for _ in range(0,32)]
+
+
+def is_bit_set(byte,nth):
+    return (byte & (1<<nth)) 
 
 class Screen():
     def __init__(self) -> None:
-        pass
-    def clear(self): return
-    def draw(self, opcode): return
+        self._screen = init_screen()
+    def clear(self):
+        print("clearing")
+        self._screen = init_screen()
+    def set_bit(self, x,y):
+        self._screen[x][y] = True
+    def reset_bit(self, x,y):
+        self._screen[x][y] = False
+    def toggle_bit(self,x,y):
+        self._screen[x][y] = not self._screen[x][y]
+    def draw_bit(self, x,y, bit, byte):
+        if is_bit_set(byte,bit):
+            self.set_bit(x,y)
+        else:
+            self.reset_bit(x,y)
+    def draw_byte(self, x,y, byte):
+        for i in range(0,8):
+            self.draw_bit(x + i,y, i, byte)
+    def draw(self, opcode, index_register, memory):
+        h,l = opcode
+        x = 0x0F & h
+        y = 0xF0 & l
+        #width = 8 # always constant width
+        height = 0x0F & l
+        if mem := memory.try_get_index_memory(index_register, height):
+            for row in range(0,len(mem)):
+                byte = mem[row]
+                self.draw_byte(x,y + row, byte)
+        # which bits are supposed to be true or false?
+        # it's determined by the memory pointed by the index register
+
 
 class Emulator():
     def __init__(self) -> None:
         self.memory = None
         self.screen = Screen()
         self.registers = {
-            "vr":bytearray(16),
+            "vr":bytes(16),
             "i":0, # index and program counter are represented with ints
-            "pc":0x200 # should actually be 12bit and 16bit
+            "pc":0 # should actually be 12bit and 16bit
+            #"pc":0x200 # should actually be 12bit and 16bit
         }
         self.file_contents = None
         self.run_program = True
@@ -75,10 +119,11 @@ class Emulator():
     def get_instruction(self):
         if self.memory:
             pc = self.registers["pc"]
-            if opcode := self.memory.try_get_opcode(pc):
+            if opcode := self.memory.try_get_opcode_memory(pc):
                 h,l = opcode
                 b = bytes_to_word(h,l)
-                if is_clear(b): return Instruction.CLEAR,opcode
+                print("return byte: ", b)
+                if is_clear(b):return Instruction.CLEAR,opcode
                 if is_jmp(b): return Instruction.JMP,opcode
                 if is_set(b): return Instruction.SET,opcode
                 if is_add(b): return Instruction.ADD,opcode
@@ -104,7 +149,11 @@ class Emulator():
     def set_vreg(self,opcode):
         vreg = self.get_register_x(opcode)
         set_nn = self.get_nn(opcode)
-        self.registers["vr"][vreg] = set_nn
+        vr = self.registers["vr"]
+        l = list(vr)
+        l[vreg] = int.from_bytes(set_nn)
+        nb = bytes(l)
+        self.registers["vr"] = nb
     def set_i(self,opcode):
         set_nnn = self.get_nnn(opcode)
         self.registers["i"] = set_nnn
@@ -117,9 +166,11 @@ class Emulator():
                 case Instruction.SET: return self.set_vreg(opcode)
                 case Instruction.ADD: return self.v_add(opcode)
                 case Instruction.SETI: return self.set_i(opcode)
-                case Instruction.DRAW: return self.screen.draw(opcode)
+                case Instruction.DRAW:
+                    index = self.registers["i"]
+                    print("drawing...")
+                    return self.screen.draw(opcode,index,self.memory)
                 case _: return
-        return
     def terminate(self):
         while self.run_program:
             if input("Abort? (Y)") == "Y":
