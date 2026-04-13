@@ -40,7 +40,12 @@ class Word():
 
 class Memory():
     def __init__(self, ba) -> None:
-        self._memory = bytearray(ba)
+        self._memory = bytearray(0x1000)
+        for i in range(0,0xFFF):
+            if i < len(ba):
+                self._memory[i] = ba[i]
+            else:
+                self._memory[i] = 0
     def try_get_index_memory(self, index, rows):
         try:
             #width = 8
@@ -52,11 +57,15 @@ class Memory():
         except:
             return None
     def try_get_opcode_memory(self,pc):
-        high = self._memory[pc]
-        print(high)
-        low = self._memory[pc + 1]
-        print(low)
-        return (high,low)
+        try:
+            high = self._memory[pc]
+            print(high)
+            low = self._memory[pc + 1]
+            print(low)
+            return (high,low)
+        except:
+            print("pc at: ", pc)
+            raise Exception()
 
 def init_screen() : return [[False for _ in range(0,64)] for _ in range(0,32)]
 
@@ -131,7 +140,9 @@ class Emulator():
                 if is_draw(b): return Instruction.DRAW,opcode
         return None      
     def set_pc(self, opcode):
-        address = 0x0FFF & opcode
+        h,l = opcode
+        b = bytes_to_word(h,l)
+        address = 0x0FFF & b
         self.registers["pc"] = address
     def get_register_x(self, opcode):
         h,_ = opcode
@@ -144,8 +155,10 @@ class Emulator():
         return bytes_to_word(h,l)
     def v_add(self, opcode):
         vreg = self.get_register_x(opcode)
-        add_nn = self.get_nn(opcode)
-        self.registers["vr"][vreg] += add_nn
+        add_nn = int.from_bytes(self.get_nn(opcode))
+        l = list(self.registers["vr"])
+        l[vreg] += add_nn
+        self.registers["vr"] = bytes(l)
     def set_vreg(self,opcode):
         vreg = self.get_register_x(opcode)
         set_nn = self.get_nn(opcode)
@@ -175,13 +188,17 @@ class Emulator():
         while self.run_program:
             if input("Abort? (Y)") == "Y":
                 self.run_program = False
+    def increment_pc(self):
+        self.registers["pc"] = self.registers["pc"] + 2 # increment pc by two (each instruction is 16-bit)
+        if self.registers["pc"] > 0xFFF:
+            self.registers["pc"] = 0
     def run_cpu_loop(self):
         if self.memory:
             t = threading.Thread(target=self.terminate)
             t.start()
             while self.run_program:
                 instruction = self.get_instruction() # decode opcode/fetch instruction
-                self.registers["pc"] = self.registers["pc"] + 2 # increment pc by two (each instruction is 16-bit)
+                self.increment_pc()
                 self.execute_instruction(instruction) # execute instruction
             t.join()
 
