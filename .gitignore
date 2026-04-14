@@ -1,3 +1,4 @@
 *.txt
 *.ch8
+*.json
 __pycache__/
