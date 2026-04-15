@@ -14,7 +14,6 @@ class Instruction(str,Enum):
     SETI="SETI",     #annn 
     DRAW="DRAW",     #dxyn
 
-
 class Ch8Byte():
     def __init__(self,nr) -> None:
         self._byte = nr & 0x00FF
@@ -64,8 +63,10 @@ class Memory():
             print("pc at: ", pc)
             raise Exception()
 
-#def init_screen() : return [[False for _ in range(0,32)] for _ in range(0,64)]
-def init_screen() : return [[True for _ in range(0,64)] for _ in range(0,32)]
+screen_max_x = 64
+screen_max_y = 32
+def init_screen() : return [[True for _ in range(0,screen_max_x)] for _ in range(0,screen_max_y)]
+def reset_screen() : return [[False for _ in range(0,screen_max_x)] for _ in range(0,screen_max_y)]
 
 def is_bit_set(byte,nth):
     return (byte & (1<<nth)) > 0
@@ -92,24 +93,25 @@ class Screen():
         self.game_screen = pygame.display.set_mode((800, 600))
         self._screen = init_screen()
     def clear(self):
-        self._screen = [[False for _ in range(0,64)] for _ in range(0,32)]
+        self._screen = reset_screen()
     def set_bit(self, x,y):
-        self._screen[x][y] = True
+        self._screen[y][x] = True
     def reset_bit(self, x,y):
-        self._screen[x][y] = False
+        self._screen[y][x] = False
     def toggle_bit(self,x,y):
-        self._screen[x][y] = not self._screen[x][y]
+        self._screen[y][x] = not self._screen[y][x]
     def draw_bit(self, x,y, byte, nth):
-        s = self._screen[x][y]
-        do_set = is_bit_set(byte, nth)
-        f = False
-        if do_set:
-            self.set_bit(x,y)
-        else:
-            if s:
-                f = True
+        try:
+            if is_bit_set(byte, nth):
+                self.set_bit(x,y)
+                return False
+            s = self._screen[y][x]
             self.reset_bit(x,y)
-        return f
+            if s:
+                return True
+            return False
+        except:
+            raise Exception("coord is", x,y)
     def draw_byte(self, x,y, byte):
         #print("drawing byte", byte)
         f = False
@@ -118,13 +120,12 @@ class Screen():
             if self.draw_bit(x + i,y, byte, i):
                 f = True
         return f
-    def draw(self, opcode, index_register, memory):
+    def draw(self, opcode, x, y, index_register, memory):
         f = False
-        h,l = opcode
-        x = 0x0F & h
-        y = (0xF0 & l) >> 4
+        _,l = opcode
         #width = 8 # always constant width
         height = 0x0F & l
+        print("COORD IS ", x,y)
         if mem := memory.try_get_index_memory(index_register, height):
             #print("number of rows", height)
             #print("lower byte", l)
@@ -187,17 +188,22 @@ class Emulator():
         b = bytes_to_word(h,l)
         return 0x0FFF & b
     def set_pc(self, opcode):
+        #self.registers["pc"] = self.get_nnn(opcode) 
         self.registers["pc"] = self.get_nnn(opcode)
+        if self.registers["pc"] > 0xFFF:
+            self.registers["pc"] = self.registers["pc"] % 0xFFF
     def get_register_x(self, opcode):
         h,_ = opcode
         return h & 0x0F
     def get_nn(self, opcode):
         _,l = opcode
-        return l.to_bytes()
+        #return l.to_bytes()
+        return l
     def v_add(self, opcode):
         # does not set carry flag
         vreg = self.get_register_x(opcode)
-        add_nn = int.from_bytes(self.get_nn(opcode))
+        #add_nn = int.from_bytes(self.get_nn(opcode))
+        add_nn = self.get_nn(opcode)
         l = list(self.registers["vr"])
         #print("ADDING nn", add_nn, "with vreg", l[vreg], "vreg number", vreg)
         l[vreg] += add_nn
@@ -210,7 +216,8 @@ class Emulator():
         set_nn = self.get_nn(opcode)
         vr = self.registers["vr"]
         l = list(vr)
-        l[vreg] = int.from_bytes(set_nn)
+        #l[vreg] = int.from_bytes(set_nn)
+        l[vreg] = set_nn
         nb = bytes(l)
         self.registers["vr"] = nb
     def set_i(self,opcode):
@@ -228,8 +235,16 @@ class Emulator():
         index = self.registers["i"]
         #print("drawing...")
         vr = self.registers["vr"]
+        h,l = opcode
+        vx = 0x0F & h
+        vy = (0xF0 & l) >> 4
         l = list(vr)
-        if self.screen.draw(opcode,index,self.memory):
+        x = l[vx]
+        y = l[vy]
+        if x > 31: x = x % (screen_max_x - 1)
+        if y > 63: y = y % (screen_max_y - 1)
+        print(x,y, "XY HERE")
+        if self.screen.draw(opcode,x,y,index,self.memory):
             l[0x0F] = 1
         else:
             l[0x0F] = 0
@@ -251,8 +266,8 @@ class Emulator():
             raise Exception("unable to parse: ", result)
     def increment_pc(self):
         self.registers["pc"] = self.registers["pc"] + 2 # increment pc by two (each instruction is 16-bit)
-        if self.registers["pc"] > 0x1000:
-            self.registers["pc"] = 0
+        if self.registers["pc"] > 0xFFF:
+            self.registers["pc"] = self.registers["pc"] % 0xFFF
     def write_history_to_json(self):
         print("writing history")
         js = json.dumps(self.instruction_history)
@@ -273,7 +288,6 @@ class Emulator():
                 
         self.write_history_to_json()
     
-
 
 if __name__ == "__main__":
     print("hellooo")
