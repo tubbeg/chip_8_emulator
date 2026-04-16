@@ -16,52 +16,127 @@ class Instruction(str,Enum):
 
 class Ch8Byte():
     def __init__(self,nr) -> None:
-        self._byte = nr & 0x00FF
+        self._byte = nr & 0xFF # this should throw an exception instead
+    def add_byte(self,nr):
+        n = nr & 0xFF
+        self._byte = (self._byte + n) % 0xFF
+    def set_value(self,nr):
+        n = nr & 0xFF
+        self._byte = n % 0xFF
+    def get_byte_value(self):
+        return self._byte
+    def get_lower_nibble(self):
+        return self._byte & 0x0F
+    def get_higher_nibble(self):
+        return self._byte >> 4
+    def lower_nibble_is_equal_to(self,nr):
+        return self.get_lower_nibble() == nr
+    def higher_nibble_is_equal_to(self,nr):
+        return self.get_higher_nibble() == nr
+    def is_equal_to(self,nr): return self._byte == nr
+    def increment(self):
+        self._byte += 1
+        if self._byte > 0xFF:
+            self._byte = 0
+            return True # carry overflow
+        return False
+    def bit_is_set(self,nth):
+        return (self._byte & (1<<nth)) > 0
 
-def is_var_instruction(word, compare): return word & 0xf000 == compare
+class Ch8Word():
+    def __init__(self) -> None:
+        self.high = None
+        self.low = None
+    def init_word(self, high, low):
+        # essentially an additional constructor that can crash :)
+        if not isinstance(high, Ch8Byte) or not isinstance(low, Ch8Byte):
+            raise Exception("not initialized")
+        self.high = high
+        self.low = low
+        return self
+    def get_higher_byte(self): return self.high
+    def get_lower_byte(self): return self.low
+    def _bytes_to_word(self,high,low):
+        h = high << 8
+        return h | low
+    def get_word_value(self):
+        if self.high and self.low:
+            high = self.high.get_byte_value()
+            low = self.low.get_byte_value()
+            return self._bytes_to_word(high,low)
+        raise Exception("not initialized")
+    def increment(self):
+        if self.high and self.low:
+            if self.low.increment():
+                return self.high.increment()
+            return False
+        raise Exception("not initialized")
+    def get_low_byte_higher_nibble(self):
+        if self.low:
+            return self.low.get_higher_nibble()
+        raise Exception()
+    def get_low_byte_lower_nibble(self):
+        if self.low:
+            return self.low.get_lower_nibble()
+        raise Exception()
+    def get_high_byte_lower_nibble(self):
+        if self.high:
+            return self.high.get_lower_nibble()
+        raise Exception()
+    def get_lower_NN(self):
+        if self.low: return self.low.get_byte_value()
+        raise Exception("not initialized")
+    def get_lower_NNN(self):
+        if self.high and self.low:
+            hbln = self.high.get_lower_nibble()
+            lb = self.low.get_byte_value()
+            return Ch8Word().init_word(Ch8Byte(hbln), Ch8Byte(lb))
+        raise Exception("not initialized")
+        
 
-def is_clear(byte): return byte & 0x00f0 == 0x00e0
 
-def is_jmp(byte): return is_var_instruction(byte,0x1000)
+def is_clear(op):
+    h = op.get_higher_byte().is_equal_to(0x00)
+    l = op.get_lower_byte().is_equal_to(0xe0)
+    return h and l
 
-def is_set(byte): return is_var_instruction(byte,0x6000)
+def is_jmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x1)
 
-def is_add(byte): return is_var_instruction(byte,0x7000)
+def is_set(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x6)
 
-def is_seti(byte): return is_var_instruction(byte,0xa000)
+def is_add(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x7)
 
-def is_draw(byte): return is_var_instruction(byte,0xd000)
+def is_seti(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xA)
+
+def is_draw(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xD)
 
 
 # 4096 bytes memory with first 512 bytes reserved
 # big endian
 # 16b v registers, one program counter (16-bit), one memory (index) register 12 bit
 
-def bytes_to_word(high,low):
-    h = high << 8
-    return h | low
-
 class Memory():
     def __init__(self, ba) -> None:
-        self._memory = bytearray(0x1000)
+        l = []
         for i in range(0,0x1000):
             if i >= 0x200 and i < len(ba) + 0x200:
-                self._memory[i] = ba[i - 0x200]
+                l.append(Ch8Byte(ba[i - 0x200]))
             else:
-                self._memory[i] = 0
+                l.append(Ch8Byte(0))
+        self._memory = l
     def try_get_index_memory(self, index, rows):
             try:
                 return self._memory[index:index + rows]
             except:
-                return None
+                raise Exception()
     def try_get_opcode_memory(self,pc):
         try:
-            high = self._memory[pc]
-            low = self._memory[pc + 1]
-            return (high,low)
+            nr = pc.get_word_value()
+            high = self._memory[nr]
+            low = self._memory[nr + 1]
+            return Ch8Word().init_word(high,low)
         except:
-            print("pc at: ", pc)
-            raise Exception()
+            raise Exception("pc at: ", type(pc))
 
 screen_max_x = 64
 screen_max_y = 32
@@ -101,8 +176,8 @@ class Screen():
     def toggle_bit(self,x,y):
         self._screen[y][x] = not self._screen[y][x]
     def draw_bit(self, x,y, byte, nth):
-        try:
-            if is_bit_set(byte, nth):
+        #try:
+            if byte.bit_is_set(nth):
                 self.set_bit(x,y)
                 return False
             s = self._screen[y][x]
@@ -110,8 +185,8 @@ class Screen():
             if s:
                 return True
             return False
-        except:
-            raise Exception("coord is", x,y)
+        #except:
+            #raise Exception("coord is", x,y)
     def draw_byte(self, x,y, byte):
         #print("drawing byte", byte)
         f = False
@@ -120,30 +195,15 @@ class Screen():
             if self.draw_bit(x + i,y, byte, i):
                 f = True
         return f
-    def draw(self, opcode, x, y, index_register, memory):
+    def draw(self, height, x, y, index_register, memory):
         f = False
-        _,l = opcode
-        #width = 8 # always constant width
-        height = 0x0F & l
-        print("COORD IS ", x,y)
         if mem := memory.try_get_index_memory(index_register, height):
-            #print("number of rows", height)
-            #print("lower byte", l)
-            #print(mem, "len:", len(mem))
             j = 0
             for row in mem:
                 if self.draw_byte(x,y + j, row):
                     f = True
                 j += 1
         return f
-    def write_to_disk_csv(self):
-        with open("data2.csv", "w") as f:
-            w = csv.writer(f)
-            w.writerow(self._screen)    
-    def write_to_disk_json(self):
-        js = json.dumps(self._screen)
-        with open("data2.json", "w") as f:
-            f.write(js)
         # which bits are supposed to be true or false?
         # it's determined by the memory pointed by the index register
 
@@ -155,9 +215,9 @@ class Emulator():
         self.memory = None
         self.screen = Screen()
         self.registers = {
-            "vr":bytes(16),
-            "i":0, # index and program counter are represented with ints
-            "pc":0x200 # should actually be 12bit and 16bit
+            "vr":[Ch8Byte(0) for i in range(0,16)],
+            "i":Ch8Word().init_word(Ch8Byte(0), Ch8Byte(0)), # index
+            "pc":Ch8Word().init_word(Ch8Byte(0x0), Ch8Byte(0x00))  # should actually be 12bit
         }
         self.file_contents = None
         self.run_program = True
@@ -173,87 +233,45 @@ class Emulator():
         if self.memory:
             pc = self.registers["pc"]
             if opcode := self.memory.try_get_opcode_memory(pc):
-                h,l = opcode
-                b = bytes_to_word(h,l)
-                if is_clear(b):return Instruction.CLEAR,opcode
-                if is_jmp(b): return Instruction.JMP,opcode
-                if is_set(b): return Instruction.SET,opcode
-                if is_add(b): return Instruction.ADD,opcode
-                if is_seti(b): return Instruction.SETI,opcode
-                if is_draw(b): return Instruction.DRAW,opcode
-        print("found none")
+                if is_clear(opcode):return Instruction.CLEAR,opcode
+                if is_jmp(opcode): return Instruction.JMP,opcode
+                if is_set(opcode): return Instruction.SET,opcode
+                if is_add(opcode): return Instruction.ADD,opcode
+                if is_seti(opcode): return Instruction.SETI,opcode
+                if is_draw(opcode): return Instruction.DRAW,opcode
         return None      
-    def get_nnn(self,opcode):
-        h,l = opcode
-        b = bytes_to_word(h,l)
-        return 0x0FFF & b
-    def set_pc(self, opcode):
-        #self.registers["pc"] = self.get_nnn(opcode) 
-        self.registers["pc"] = self.get_nnn(opcode)
-        if self.registers["pc"] > 0xFFF:
-            self.registers["pc"] = self.registers["pc"] % 0xFFF
-    def get_register_x(self, opcode):
-        h,_ = opcode
-        return h & 0x0F
-    def get_nn(self, opcode):
-        _,l = opcode
-        #return l.to_bytes()
-        return l
+    def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
     def v_add(self, opcode):
         # does not set carry flag
-        vreg = self.get_register_x(opcode)
-        #add_nn = int.from_bytes(self.get_nn(opcode))
-        add_nn = self.get_nn(opcode)
-        l = list(self.registers["vr"])
-        #print("ADDING nn", add_nn, "with vreg", l[vreg], "vreg number", vreg)
-        l[vreg] += add_nn
-        if l[vreg] > 0xFF:
-            l[vreg] = l[vreg] % 0xFF
-        #print("result", l[vreg])
-        self.registers["vr"] = bytes(l)
+        vreg = opcode.get_high_byte_lower_nibble()
+        self.registers["vr"][vreg].add_byte(opcode.get_lower_NN())
     def set_vreg(self,opcode):
-        vreg = self.get_register_x(opcode)
-        set_nn = self.get_nn(opcode)
-        vr = self.registers["vr"]
-        l = list(vr)
-        #l[vreg] = int.from_bytes(set_nn)
-        l[vreg] = set_nn
-        nb = bytes(l)
-        self.registers["vr"] = nb
-    def set_i(self,opcode):
-        set_nnn = self.get_nnn(opcode)
-        #print("set is", set_nnn)
-        self.registers["i"] = set_nnn
-    def save_commit(self, result):
+        vreg = opcode.get_high_byte_lower_nibble()
+        set_nn = opcode.get_lower_NN()
+        self.registers["vr"][vreg] = Ch8Byte(set_nn)
+    def set_i(self,opcode): self.registers["i"] = opcode.get_lower_NNN() # fyi, returns new instance
+    def save_commit(self, result): 
         if result:
-            instruction, (h,l) = result
-            checkpoint = instruction, {"high":h, "low":l}, {"hex_string": (hex(h), hex(l))} 
-            self.instruction_history.append(checkpoint)
+            pass
         else:
             self.instruction_history.append("Failed to parse")
     def draw(self, opcode):
-        index = self.registers["i"]
-        #print("drawing...")
-        vr = self.registers["vr"]
-        h,l = opcode
-        vx = 0x0F & h
-        vy = (0xF0 & l) >> 4
-        l = list(vr)
-        x = l[vx]
-        y = l[vy]
-        if x > 31: x = x % (screen_max_x - 1)
-        if y > 63: y = y % (screen_max_y - 1)
-        print(x,y, "XY HERE")
-        if self.screen.draw(opcode,x,y,index,self.memory):
-            l[0x0F] = 1
+        index = self.registers["i"].get_word_value()
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        x = self.registers["vr"][vx].get_byte_value()
+        y = self.registers["vr"][vy].get_byte_value()
+        #if x > 31: x = x % (screen_max_x - 1)
+        #if y > 63: y = y % (screen_max_y - 1)
+        height = opcode.get_low_byte_lower_nibble()
+        if self.screen.draw(height,x,y,index,self.memory):
+            self.registers["vr"][0x0F] = Ch8Byte(1)
         else:
-            l[0x0F] = 0
-        self.registers["vr"] = bytes(l)
+            self.registers["vr"][0x0F] = Ch8Byte(0)
     def execute_instruction(self,result):
         self.save_commit(result)
         if result:
             instruction, opcode = result
-            print(instruction)
             match instruction:
                 case Instruction.CLEAR: return self.screen.clear()
                 case Instruction.JMP: return self.set_pc(opcode)
@@ -263,11 +281,13 @@ class Emulator():
                 case Instruction.DRAW: return self.draw(opcode)
                 case _: return
         else:
+            return
             raise Exception("unable to parse: ", result)
     def increment_pc(self):
-        self.registers["pc"] = self.registers["pc"] + 2 # increment pc by two (each instruction is 16-bit)
-        if self.registers["pc"] > 0xFFF:
-            self.registers["pc"] = self.registers["pc"] % 0xFFF
+        self.registers["pc"].increment()
+        self.registers["pc"].increment()
+        if self.registers["pc"].get_word_value() > 0xFFF: # out of memory
+            self.registers["pc"] = Ch8Word().init_word(Ch8Byte(0), Ch8Byte(0))
     def write_history_to_json(self):
         print("writing history")
         js = json.dumps(self.instruction_history)
