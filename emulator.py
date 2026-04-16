@@ -138,13 +138,17 @@ class Memory():
         except:
             raise Exception("pc at: ", type(pc))
 
-screen_max_x = 64
-screen_max_y = 32
-def init_screen() : return [[True for _ in range(0,screen_max_x)] for _ in range(0,screen_max_y)]
-def reset_screen() : return [[False for _ in range(0,screen_max_x)] for _ in range(0,screen_max_y)]
+screen_max_x = 64 #  8x8 bits
+screen_max_y = 32 # 8x4 bits
 
-def is_bit_set(byte,nth):
-    return (byte & (1<<nth)) > 0
+
+def default_screen():
+    screen = {}
+    for i in range(0,screen_max_x):
+        for j in range(0,screen_max_y):
+            s = "k" + str(i) + str(j)
+            screen[s] = False
+    return screen
 
 class Screen():
     def __init__(self) -> None:
@@ -157,41 +161,38 @@ class Screen():
         self.game_screen.fill("grey")
         x_init,y_init = 50,50
         x,y = x_init,y_init
-        for row in self._screen:
-            for pixel in row:
-                self.draw_pygame_pixel(x,y, 7, 7, pixel)
+        for i in range(0,screen_max_x):
+            for j in range(0,screen_max_y):
+                self.draw_pygame_pixel(x,y, 7, 7, self._screen[self.get_key_str(i,j)])
                 x += 10
             x = x_init
             y += 10
         pygame.display.flip()
+    def get_key_str(self,x,y):
+        return "k" + str(x) + str(y)
     def init_screen(self):
         self.game_screen = pygame.display.set_mode((800, 600))
-        self._screen = init_screen()
+        self._screen = default_screen()
     def clear(self):
-        self._screen = reset_screen()
+        self._screen = default_screen()
     def set_bit(self, x,y):
-        self._screen[y][x] = True
+        self._screen[self.get_key_str(x,y)] = True
     def reset_bit(self, x,y):
-        self._screen[y][x] = False
+        self._screen[self.get_key_str(x,y)] = False
     def toggle_bit(self,x,y):
-        self._screen[y][x] = not self._screen[y][x]
+        self._screen[self.get_key_str(x,y)] = not self._screen[self.get_key_str(x,y)]
     def draw_bit(self, x,y, byte, nth):
-        #try:
-            if byte.bit_is_set(nth):
-                self.set_bit(x,y)
-                return False
-            s = self._screen[y][x]
-            self.reset_bit(x,y)
-            if s:
-                return True
+        if byte.bit_is_set(nth):
+            self.set_bit(x,y)
             return False
-        #except:
-            #raise Exception("coord is", x,y)
+        s = self._screen[self.get_key_str(x,y)]
+        self.reset_bit(x,y)
+        if s:
+            return True
+        return False
     def draw_byte(self, x,y, byte):
-        #print("drawing byte", byte)
         f = False
         for i in range(0,8):
-            #print("drawing bit", i, "is set bit?", is_bit_set(byte, i))
             if self.draw_bit(x + i,y, byte, i):
                 f = True
         return f
