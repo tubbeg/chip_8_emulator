@@ -5,7 +5,6 @@ import time
 import csv
 import pygame
 
-
 class Instruction(str,Enum):
     CLEAR="CLEAR",    #00e0 
     JMP="JMP",      #1nnn 
@@ -98,8 +97,6 @@ class Ch8Word():
             return Ch8Word().init_word(Ch8Byte(hbln), Ch8Byte(lb))
         raise Exception("not initialized")
         
-
-
 def is_clear(op):
     h = op.get_higher_byte().is_equal_to(0x00)
     l = op.get_lower_byte().is_equal_to(0xe0)
@@ -114,7 +111,6 @@ def is_add(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x7)
 def is_seti(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xA)
 
 def is_draw(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xD)
-
 
 # 4096 bytes memory with first 512 bytes reserved
 # big endian
@@ -146,6 +142,7 @@ class Memory():
 screen_max_x = 32 #  8x8 bits
 screen_max_y = 64 # 8x4 bits
 
+DEBUG = False
 
 def default_screen():
     screen = {}
@@ -154,7 +151,6 @@ def default_screen():
             s = "k" + str(i) + str(j)
             screen[s] = False
     return screen
-
 
 class Screen():
     def __init__(self) -> None:
@@ -170,9 +166,9 @@ class Screen():
         for i in range(0,screen_max_x):
             for j in range(0,screen_max_y):
                 self.draw_pygame_pixel(y,x, 7, 7, self._screen[self.get_key_str(j,i)])
-                y += 10
+                y += 8
             y = y_init
-            x += 10
+            x += 8
         pygame.display.flip()
     def get_key_str(self,x,y):
         return "k" + str(x) + str(y)
@@ -191,6 +187,7 @@ class Screen():
         f = False
         l = [byte.bit_is_set(i) for i in range(0,8)]
         for bit in list(reversed(l)):
+            print("Drawing coordinate", x_pos,y)
             if self.xor_bit(x_pos,y,bit): f = True
             x_pos += 1
         return f
@@ -200,6 +197,9 @@ class Screen():
         for b in mem:
             if self.draw_byte(x,y_pos,b): f = True
             y_pos += 1
+        if DEBUG:
+            print("===========================================")
+            input("Pause for exec")
         return f
         # which bits are supposed to be true or false?
         # it's determined by the memory pointed by the index register
@@ -261,8 +261,8 @@ class Emulator():
             vy = opcode.get_low_byte_higher_nibble()
             x = self.registers["vr"][vx].get_byte_value()
             y = self.registers["vr"][vy].get_byte_value()
-            #if x > (screen_max_x - 1): x = x % (screen_max_x - 1)
-            #if y > (screen_max_y - 1): y = y % (screen_max_y - 1)
+            #if x > (screen_max_y - 1): x = x % (screen_max_y - 1)
+            #if y > (screen_max_x - 1): y = y % (screen_max_x - 1)
             number_of_bytes = opcode.get_low_byte_lower_nibble()
             if mem := self.memory.try_get_index_memory(index, number_of_bytes):
                 if self.screen.draw(mem,x,y):
@@ -285,17 +285,11 @@ class Emulator():
                 case _: return
         else:
             return
-            raise Exception("unable to parse: ", result)
     def increment_pc(self):
         self.registers["pc"].increment()
         self.registers["pc"].increment()
         if self.registers["pc"].get_word_value() > 0xFFF: # out of memory
             self.registers["pc"] = Ch8Word().init_word(Ch8Byte(0), Ch8Byte(0))
-    def write_history_to_json(self):
-        print("writing history")
-        js = json.dumps(self.instruction_history)
-        with open("history.json", "w") as f:
-            f.write(js)
     def run_cpu_loop(self):
         if self.memory:
             self.screen.init_screen()
@@ -308,12 +302,9 @@ class Emulator():
                 instruction = self.get_instruction() # decode opcode/fetch instruction
                 self.increment_pc()
                 self.execute_instruction(instruction) # execute instruction
-                
-        self.write_history_to_json()
     
 
 if __name__ == "__main__":
-    print("hellooo")
     a = Instruction.CLEAR
     path = "test.ch8"
     e = Emulator()
