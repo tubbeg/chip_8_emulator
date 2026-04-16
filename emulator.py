@@ -16,8 +16,13 @@ class Instruction(str,Enum):
 
 class Ch8Byte():
     def __init__(self,nr) -> None:
-        self._byte = nr & 0xFF # this should throw an exception instead
+        if nr > 255 or nr < 0:
+            # ordinarily, a constructor should never throw an exception
+            raise Exception("bad number")
+        self._byte = nr
     def add_byte(self,nr):
+        if nr > 255 or nr < 0:
+            raise Exception("bad number")
         n = nr & 0xFF
         self._byte = (self._byte + n) % 0xFF
     def set_value(self,nr):
@@ -124,9 +129,9 @@ class Memory():
             else:
                 l.append(Ch8Byte(0))
         self._memory = l
-    def try_get_index_memory(self, index, rows):
+    def try_get_index_memory(self, index, number_of_bytes):
             try:
-                return self._memory[index:index + rows]
+                return self._memory[index:index + number_of_bytes]
             except:
                 raise Exception()
     def try_get_opcode_memory(self,pc):
@@ -138,17 +143,18 @@ class Memory():
         except:
             raise Exception("pc at: ", type(pc))
 
-screen_max_x = 64 #  8x8 bits
-screen_max_y = 32 # 8x4 bits
+screen_max_x = 32 #  8x8 bits
+screen_max_y = 64 # 8x4 bits
 
 
 def default_screen():
     screen = {}
-    for i in range(0,screen_max_x):
-        for j in range(0,screen_max_y):
+    for i in range(0,screen_max_y):
+        for j in range(0,screen_max_x):
             s = "k" + str(i) + str(j)
             screen[s] = False
     return screen
+
 
 class Screen():
     def __init__(self) -> None:
@@ -163,10 +169,10 @@ class Screen():
         x,y = x_init,y_init
         for i in range(0,screen_max_x):
             for j in range(0,screen_max_y):
-                self.draw_pygame_pixel(x,y, 7, 7, self._screen[self.get_key_str(i,j)])
-                x += 10
-            x = x_init
-            y += 10
+                self.draw_pygame_pixel(y,x, 7, 7, self._screen[self.get_key_str(j,i)])
+                y += 10
+            y = y_init
+            x += 10
         pygame.display.flip()
     def get_key_str(self,x,y):
         return "k" + str(x) + str(y)
@@ -175,35 +181,25 @@ class Screen():
         self._screen = default_screen()
     def clear(self):
         self._screen = default_screen()
-    def set_bit(self, x,y):
-        self._screen[self.get_key_str(x,y)] = True
-    def reset_bit(self, x,y):
-        self._screen[self.get_key_str(x,y)] = False
-    def toggle_bit(self,x,y):
-        self._screen[self.get_key_str(x,y)] = not self._screen[self.get_key_str(x,y)]
-    def draw_bit(self, x,y, byte, nth):
-        if byte.bit_is_set(nth):
-            self.set_bit(x,y)
-            return False
-        s = self._screen[self.get_key_str(x,y)]
-        self.reset_bit(x,y)
-        if s:
-            return True
-        return False
+    def xor_bit(self,x,y, bit):
+        current = self._screen[self.get_key_str(x,y)]
+        next = (current and not bit) or (not current and bit) # xor operation
+        self._screen[self.get_key_str(x,y)] = next
+        return not next and current # carry flag
     def draw_byte(self, x,y, byte):
+        x_pos = x
         f = False
-        for i in range(0,8):
-            if self.draw_bit(x + i,y, byte, i):
-                f = True
+        l = [byte.bit_is_set(i) for i in range(0,8)]
+        for bit in list(reversed(l)):
+            if self.xor_bit(x_pos,y,bit): f = True
+            x_pos += 1
         return f
-    def draw(self, height, x, y, index_register, memory):
+    def draw(self, mem, x, y):
         f = False
-        if mem := memory.try_get_index_memory(index_register, height):
-            j = 0
-            for row in mem:
-                if self.draw_byte(x,y + j, row):
-                    f = True
-                j += 1
+        y_pos = y
+        for b in mem:
+            if self.draw_byte(x,y_pos,b): f = True
+            y_pos += 1
         return f
         # which bits are supposed to be true or false?
         # it's determined by the memory pointed by the index register
@@ -218,7 +214,7 @@ class Emulator():
         self.registers = {
             "vr":[Ch8Byte(0) for i in range(0,16)],
             "i":Ch8Word().init_word(Ch8Byte(0), Ch8Byte(0)), # index
-            "pc":Ch8Word().init_word(Ch8Byte(0x0), Ch8Byte(0x00))  # should actually be 12bit
+            "pc":Ch8Word().init_word(Ch8Byte(0x02), Ch8Byte(0x00))  # should actually be 12bit
         }
         self.file_contents = None
         self.run_program = True
@@ -232,8 +228,7 @@ class Emulator():
             self.memory = Memory(self.file_contents)
     def get_instruction(self):
         if self.memory:
-            pc = self.registers["pc"]
-            if opcode := self.memory.try_get_opcode_memory(pc):
+            if opcode := self.memory.try_get_opcode_memory(self.registers["pc"]):
                 if is_clear(opcode):return Instruction.CLEAR,opcode
                 if is_jmp(opcode): return Instruction.JMP,opcode
                 if is_set(opcode): return Instruction.SET,opcode
@@ -248,27 +243,34 @@ class Emulator():
         self.registers["vr"][vreg].add_byte(opcode.get_lower_NN())
     def set_vreg(self,opcode):
         vreg = opcode.get_high_byte_lower_nibble()
-        set_nn = opcode.get_lower_NN()
-        self.registers["vr"][vreg] = Ch8Byte(set_nn)
+        self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
     def set_i(self,opcode): self.registers["i"] = opcode.get_lower_NNN() # fyi, returns new instance
     def save_commit(self, result): 
         if result:
             pass
         else:
             self.instruction_history.append("Failed to parse")
+    def set_carry_flag(self):
+        self.registers["vr"][0x0F] = Ch8Byte(1)
+    def reset_carry_flag(self):
+        self.registers["vr"][0x0F] = Ch8Byte(0)
     def draw(self, opcode):
-        index = self.registers["i"].get_word_value()
-        vx = opcode.get_high_byte_lower_nibble()
-        vy = opcode.get_low_byte_higher_nibble()
-        x = self.registers["vr"][vx].get_byte_value()
-        y = self.registers["vr"][vy].get_byte_value()
-        #if x > 31: x = x % (screen_max_x - 1)
-        #if y > 63: y = y % (screen_max_y - 1)
-        height = opcode.get_low_byte_lower_nibble()
-        if self.screen.draw(height,x,y,index,self.memory):
-            self.registers["vr"][0x0F] = Ch8Byte(1)
-        else:
-            self.registers["vr"][0x0F] = Ch8Byte(0)
+        if self.memory:
+            index = self.registers["i"].get_word_value()
+            vx = opcode.get_high_byte_lower_nibble()
+            vy = opcode.get_low_byte_higher_nibble()
+            x = self.registers["vr"][vx].get_byte_value()
+            y = self.registers["vr"][vy].get_byte_value()
+            #if x > (screen_max_x - 1): x = x % (screen_max_x - 1)
+            #if y > (screen_max_y - 1): y = y % (screen_max_y - 1)
+            number_of_bytes = opcode.get_low_byte_lower_nibble()
+            if mem := self.memory.try_get_index_memory(index, number_of_bytes):
+                if self.screen.draw(mem,x,y):
+                    self.set_carry_flag()
+                else:
+                    self.reset_carry_flag()
+                return
+        raise Exception("no memory")
     def execute_instruction(self,result):
         self.save_commit(result)
         if result:
@@ -301,7 +303,7 @@ class Emulator():
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         self.run_program = False
-                self.game_clock.tick(60)  # limits FPS to 60
+                self.game_clock.tick(60) 
                 self.screen.update_screen()
                 instruction = self.get_instruction() # decode opcode/fetch instruction
                 self.increment_pc()
