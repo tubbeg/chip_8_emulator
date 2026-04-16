@@ -9,13 +9,15 @@ This is an emulator for the CHIP-8. Technically speaking, it's not a true emulat
 
 ### What can it do?
 
-Only one program! It can the run the 'IBM Logo' program which displays the IBM logo.
+Only one program! It can the run the 'IBM Logo' program which displays the IBM logo. Exciting, isn't it?
 
-Exciting, isn't it?
+You can find the program by searching 'IBM Logo CHIP-8' in your favourite search engine.
 
 ### What's missing?
 
 So far I've implemented 6 out of 35 instructions. And I am still not 100 % on the drawing function.
+
+Work In Progress!
 
 ### How do I run this?
 
