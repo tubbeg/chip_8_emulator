@@ -3,6 +3,7 @@ import threading
 import json
 import time
 import csv
+import sys
 import pygame
 
 class Instruction(str,Enum):
@@ -187,7 +188,8 @@ class Screen():
         f = False
         l = [byte.bit_is_set(i) for i in range(0,8)]
         for bit in list(reversed(l)):
-            print("Drawing coordinate", x_pos,y)
+            if DEBUG:
+                print("Drawing coordinate", x_pos,y)
             if self.xor_bit(x_pos,y,bit): f = True
             x_pos += 1
         return f
@@ -303,13 +305,13 @@ class Emulator():
                 self.increment_pc()
                 self.execute_instruction(instruction) # execute instruction
     
-
 if __name__ == "__main__":
-    a = Instruction.CLEAR
-    path = "test.ch8"
-    e = Emulator()
-    e.read_rom(path)
-    e.load_rom_to_memory()
-    e.run_cpu_loop()
+    if len(sys.argv) < 2:
+        print("No file path detected. Adieu!")
+    else:
+        e = Emulator()
+        e.read_rom(sys.argv[1])
+        e.load_rom_to_memory()
+        e.run_cpu_loop()
  
 
