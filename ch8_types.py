@@ -74,7 +74,7 @@ class Ch8Word():
             return self.high.get_lower_nibble()
         raise Exception()
     def get_lower_NN(self):
-        if self.low: return self.low.get_byte_value()
+        if self.low: return self.low.get_byte_value() #RETURNS A VALUE, NOT AN OBJECT!!
         raise Exception("not initialized")
     def get_lower_NNN(self):
         if self.high and self.low:

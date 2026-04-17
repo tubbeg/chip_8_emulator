@@ -6,13 +6,12 @@ from ch8_types import Ch8Byte, Ch8Word
 
 class Memory():
     def __init__(self, ba) -> None:
-        l = []
+        self._memory = []
         for i in range(0,0x1000):
             if i >= 0x200 and i < len(ba) + 0x200:
-                l.append(Ch8Byte(ba[i - 0x200]))
+                self._memory.append(Ch8Byte(ba[i - 0x200]))
             else:
-                l.append(Ch8Byte(0))
-        self._memory = l
+                self._memory.append(Ch8Byte(0))
     def try_get_index_memory(self, index, number_of_bytes):
             try:
                 return self._memory[index:index + number_of_bytes]

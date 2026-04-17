@@ -27,7 +27,11 @@ def is_draw(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xD)
 
 DEBUG = False
 
-class Emulator():
+# arithmetic logic unit, the basis of every processor
+class ALU():
+    pass
+
+class Emulator(ALU):
     def __init__(self) -> None:
         pygame.init()
         self.game_clock = pygame.time.Clock()
@@ -64,6 +68,9 @@ class Emulator():
         vreg = opcode.get_high_byte_lower_nibble()
         self.registers["vr"][vreg].add_byte(opcode.get_lower_NN())
     def set_vreg(self,opcode):
+        vreg = opcode.get_high_byte_lower_nibble()
+        self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
+    def set_vreg_from_vreg(self,opcode):
         vreg = opcode.get_high_byte_lower_nibble()
         self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
     def set_i(self,opcode): self.registers["i"] = opcode.get_lower_NNN() # FYI, returns new instance
@@ -106,6 +113,19 @@ class Emulator():
         self.registers["pc"].increment()
         if self.registers["pc"].get_word_value() > 0xFFF: # out of memory
             self.registers["pc"] = Ch8Word().init_word(Ch8Byte(0), Ch8Byte(0))
+    def skip_if_not_opcode(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        if not self.registers["vr"][vx].is_equal_to(opcode.get_lower_NN()):
+            self.increment_pc() #skips the next instruction
+    def skip_if_opcode(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        if not self.registers["vr"][vx].is_equal_to(opcode.get_lower_NN()):
+            self.increment_pc()
+    def skip_if_v_opcode(self,opcode):
+        vx = self.registers["vr"][opcode.get_high_byte_lower_nibble()]
+        vy = self.registers["vr"][opcode.get_lower_NN()]
+        if vx.is_equal_to(vy.get_byte_value()):
+            self.increment_pc()
     def _check_pygame_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -120,6 +140,7 @@ class Emulator():
                 opcode = self.get_instruction() # decode opcode/fetch instruction
                 self.increment_pc()
                 self.execute_instruction(opcode) # execute instruction
+            self.screen.save_bits()
     
 if __name__ == "__main__":
     if len(sys.argv) < 2:
