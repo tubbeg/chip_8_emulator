@@ -9,7 +9,7 @@ from instructions import Instruction
 from ch8_types import Ch8Byte, Ch8Word
 from memory import Memory
 from screen import Screen
-        
+
 def is_clear(op):
     h = op.get_higher_byte().is_equal_to(0x00)
     l = op.get_lower_byte().is_equal_to(0xe0)
@@ -41,6 +41,8 @@ def is_seti(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xA)
 def is_draw(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xD)
 
 
+update_pygame_const = 10
+
 
 DEBUG = False
 
@@ -63,6 +65,7 @@ class Emulator(ALU):
         self.run_program = True
         self.save_checkpoint = False
         self.instruction_history = []
+        self.update_freq = update_pygame_const
     def read_rom(self, path):
         with open(path, "rb") as f:
             self.file_contents = f.read()
@@ -122,8 +125,12 @@ class Emulator(ALU):
             match instruction:
                 case Instruction.CLEAR: return self.screen.clear()
                 case Instruction.JMP: return self.set_pc(opcode)
+                case Instruction.IF: return self.skip_if_opcode(opcode)
+                case Instruction.IFNOT: return self.skip_if_not_opcode(opcode)
+                case Instruction.IFV: return self.skip_if_v_opcode(opcode)
                 case Instruction.SET: return self.set_vreg(opcode)
                 case Instruction.ADD: return self.v_add(opcode)
+                case Instruction.SETV: return self.set_v(opcode)
                 case Instruction.SETI: return self.set_i(opcode)
                 case Instruction.DRAW: return self.draw(opcode)
                 case _: return
@@ -155,21 +162,26 @@ class Emulator(ALU):
         vy = opcode.get_low_byte_higher_nibble()
         val_y = self.registers["vr"][vy].get_byte_value()
         self.registers["vr"][vx] = Ch8Byte(val_y)
-    def _check_pygame_events(self):
+    def check_pygame_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.run_program = False
+    def update_pygame(self):
+        self.check_pygame_events()
+        self.screen.update_screen()
+        self.update_freq -= -1
+        if self.update_freq < 1:
+            dt = self.game_clock.tick(60) 
+            self.update_freq = update_pygame_const
     def run_cpu_loop(self):
         if self.memory:
             self.screen.init_screen()
             while self.run_program:
-                self._check_pygame_events()
-                self.game_clock.tick(60) 
-                self.screen.update_screen()
                 opcode = self.get_instruction() # decode opcode/fetch instruction
                 self.increment_pc()
                 self.execute_instruction(opcode) # execute instruction
-            self.screen.save_bits()
+                self.update_pygame()
+            #self.screen.save_bits()
     
 if __name__ == "__main__":
     if len(sys.argv) < 2:
