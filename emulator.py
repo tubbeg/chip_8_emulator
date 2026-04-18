@@ -37,7 +37,7 @@ def is_clear(op):
     return h and l
 
 def last_nibble_is_nr(op,nr):
-    return op.get_higher_byte().lower_nibble_is_equal_to(nr)
+    return op.get_lower_byte().lower_nibble_is_equal_to(nr)
 
 def last_nibble_is_zero(op):
     return last_nibble_is_nr(op,0x0)
@@ -65,6 +65,9 @@ def last_nibble_is_seven(op):
 
 def last_nibble_is_eight(op):
     return last_nibble_is_nr(op,0x8)
+
+def last_nibble_is_nine(op):
+    return last_nibble_is_nr(op,0x9)
 
 def last_nibble_is_e(op):
     return last_nibble_is_nr(op,0xE)
@@ -121,9 +124,13 @@ def is_rjmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xB)
 def is_rand(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xC)
 
 def is_if_key(op):
+    print("here here")
     h = op.get_higher_byte().higher_nibble_is_equal_to(0xe)
     lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x9)
-    return h and lhn and last_nibble_is_e(op)
+    ret = h and lhn and last_nibble_is_e(op)
+    print(op.get_word_value())
+    print(hex(op.get_word_value()), ret)
+    return ret
 
 def is_ifnot_key(op):
     h = op.get_higher_byte().higher_nibble_is_equal_to(0xe)
@@ -146,13 +153,38 @@ def is_sound(op):
     lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x1)
     return first_nibble_is_f(op) and lhn and last_nibble_is_eight(op)
 
+def is_add_i(op):
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x1)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_e(op)
+
+def is_setiv(op):
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x2)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_nine(op)
+
+def is_bcd(op): 
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x3)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_three(op)
+
+def is_store(op): 
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x5)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_five(op)
+
+def is_reload(op): 
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x6)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_five(op)
+
+def is_sbr(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x2)
+
+def is_ret(op): return op.get_word_value() == 0x00ee
+
 update_pygame_const = 10
 
-DEBUG = False
+DEBUG = True
 
 # arithmetic logic unit, the basis of every processor
 class ALU():
     pass
+
 
 class Emulator(ALU):
     def __init__(self) -> None:
@@ -171,6 +203,7 @@ class Emulator(ALU):
         self.instruction_history = []
         self.update_freq = update_pygame_const
         self.input_keys = []
+        self.stack = []
     def read_rom(self, path):
         with open(path, "rb") as f:
             self.file_contents = f.read()
@@ -206,7 +239,15 @@ class Emulator(ALU):
                 if is_get_key(opcode): return Instruction.GKEY, opcode
                 if is_set_delay(opcode): return Instruction.SDELAY, opcode
                 if is_sound(opcode): return Instruction.SOUND, opcode
-        return None      
+                if is_add_i(opcode): return Instruction.ADDI, opcode
+                if is_bcd(opcode): return Instruction.BCD, opcode
+                if is_store(opcode): return Instruction.STORE, opcode
+                if is_reload(opcode): return Instruction.RELOAD, opcode
+                if is_setiv(opcode): return Instruction.SETIV, opcode
+                if is_sbr(opcode): return Instruction.SBR, opcode
+                if is_ret(opcode): return Instruction.RET, opcode
+            raise Exception(opcode.get_word_value())
+        return None
     def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
     def set_relative_pc(self, opcode):
         nnn = opcode.get_lower_NNN()
@@ -264,6 +305,8 @@ class Emulator(ALU):
     def execute_instruction(self,result):
         if result:
             instruction, opcode = result
+            if DEBUG:
+                print(instruction)
             match instruction:
                 case Instruction.CLEAR: return self.screen.clear()
                 case Instruction.JMP: return self.set_pc(opcode)
@@ -292,9 +335,33 @@ class Emulator(ALU):
                 case Instruction.GKEY: return self.get_key(opcode)
                 case Instruction.SDELAY: return self.set_delay(opcode)
                 case Instruction.SOUND: return self.set_sound(opcode)
-                case _: return
+                case Instruction.ADDI: return self.add_i(opcode)
+                case Instruction.BCD: return self.bcd(opcode)
+                case Instruction.STORE: return self.store(opcode)
+                case Instruction.RELOAD: return self.reload(opcode)
+                case Instruction.SETIV: return self.setiv(opcode)
+                case Instruction.SBR: return self.call_subroutine(opcode)
+                case Instruction.RET: return self.return_subroutine(opcode)
+                case _: return None
         else:
-            return
+            return None
+    def return_subroutine(self,_):
+        value = self.stack.pop()
+        high, low = Ch8Byte(value >> 8), Ch8Byte(value & 0xFF)
+        self.registers["pc"] = Ch8Word().init_word(high,low)
+    def call_subroutine(self,opcode):
+        self.stack.append(self.registers["pc"].get_word_value())
+        self.registers["pc"] = opcode.get_lower_NNN()
+    def setiv(self,opcode):
+        raise Exception("NOT YET IMPLEMENTED")
+    def bcd(self,opcode):
+        raise Exception("NOT YET IMPLEMENTED")
+    def store(self,opcode):
+        raise Exception("NOT YET IMPLEMENTED")
+    def reload(self,opcode):
+        raise Exception("NOT YET IMPLEMENTED")
+    def add_i(self,opcode):
+        raise Exception("NOT YET IMPLEMENTED")
     def set_sound(self,opcode):
         raise Exception("NOT YET IMPLEMENTED")
     def set_delay(self,opcode):
