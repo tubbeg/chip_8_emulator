@@ -15,5 +15,8 @@ class Instruction(str,Enum):
     AND="AND",          #8xy2
     XOR="XOR",          #8xy3
     ADC="ADC",          #8xy4
-    SBC="SBC"           #8xy5
+    SBC="SBC",          #8xy5
+    SHIFTR="SHIFTR",    #8xy6
+    SBCREV="SBCREV",    #8xy7
+    SHIFTL="SHIFTL",    #8xye
     

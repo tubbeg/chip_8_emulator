@@ -42,6 +42,25 @@ class Ch8Byte():
         carry_flag = self._byte > 255 or self._byte < 0
         self._byte = self._byte % 255
         return int(not carry_flag) # carry flag is set to zero if vx >= vy
+    def sub_rev_with_carry(self,nr):
+        self._byte = nr - self._byte # subtracts -> vx = vy - vx
+        carry_flag = self._byte > 255 or self._byte < 0
+        self._byte = self._byte % 255
+        return int(not carry_flag)
+    def bit_or(self, nr):
+        self._byte |= nr
+    def bit_and(self,nr):
+        self._byte &= nr
+    def bit_xor(self, nr):
+        self._byte ^= nr
+    def shift_right(self):
+        lb = self.bit_is_set(0) # least significant bit
+        self._byte = self._byte >> 1
+        return int(lb)
+    def shift_left(self):
+        mb = self.bit_is_set(7) # most significant bit
+        self._byte = self._byte << 1
+        return int(mb)
 
 class Ch8Word():
     def __init__(self) -> None:

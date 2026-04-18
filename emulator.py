@@ -36,6 +36,15 @@ def last_nibble_is_four(op):
 def last_nibble_is_five(op):
     return last_nibble_is_nr(op,0x5)
 
+def last_nibble_is_six(op):
+    return last_nibble_is_nr(op,0x6)
+
+def last_nibble_is_seven(op):
+    return last_nibble_is_nr(op,0x7)
+
+def last_nibble_is_e(op):
+    return last_nibble_is_nr(op,0xE)
+
 def is_jmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x1)
 
 def is_if(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x3)
@@ -77,6 +86,19 @@ def is_add_with_carry(op):
 def is_sub_with_carry(op):
     h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
     return h and last_nibble_is_five(op)
+
+def is_shift_right(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_six(op)
+
+def is_sbc_rev(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_seven(op)
+
+def is_shift_left(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_e(op)
+
 
 update_pygame_const = 10
 
@@ -125,6 +147,9 @@ class Emulator(ALU):
                 if is_xor(opcode): return Instruction.OR, opcode
                 if is_add_with_carry(opcode): return Instruction.ADC, opcode
                 if is_sub_with_carry(opcode): return Instruction.SBC, opcode
+                if is_shift_right(opcode): return Instruction.SHIFTR, opcode
+                if is_sbc_rev(opcode): return Instruction.SBCREV, opcode
+                if is_shift_left(opcode): return Instruction.SHIFTL, opcode
         return None      
     def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
     def v_add(self, opcode):
@@ -142,6 +167,12 @@ class Emulator(ALU):
         vy = opcode.get_low_byte_higher_nibble()
         vreg_y = self.registers["vr"][vy]
         carry_flag = self.registers["vr"][vx].sub_with_carry(vreg_y.to_byte_value())
+        self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
+    def sub_reverse_with_carry(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        vreg_y = self.registers["vr"][vy]
+        carry_flag = self.registers["vr"][vx].sub_rev_with_carry(vreg_y.to_byte_value())
         self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
     def set_vreg(self,opcode):
         vreg = opcode.get_high_byte_lower_nibble()
@@ -190,6 +221,9 @@ class Emulator(ALU):
                 case Instruction.XOR: return self.bit_xor(opcode)
                 case Instruction.ADC: return self.add_with_carry(opcode)
                 case Instruction.SBC: return self.sub_with_carry(opcode)
+                case Instruction.SHIFTR: return self.shift_right(opcode)
+                case Instruction.SBCREV: return self.sub_reverse_with_carry(opcode)
+                case Instruction.SHIFTR: return self.shift_left(opcode)
                 case _: return
         else:
             return
@@ -221,17 +255,30 @@ class Emulator(ALU):
         val_x = self.registers["vr"][vx].get_byte_value()
         self.registers["vr"][vx] = fn(val_x,val_y)
     def set_v(self, opcode):
-        f = lambda x,y : Ch8Byte(y)
-        self.set_vx_fn_vy(opcode, f)
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        val_y = self.registers["vr"][vy].get_byte_value()
+        self.registers["vr"][vx] = Ch8Byte(val_y)
     def bit_or(self,opcode):
-        f = lambda x,y : Ch8Byte(x|y)
-        self.set_vx_fn_vy(opcode, f)
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        self.registers["vr"][vx].bit_or(self.registers["vr"][vy].get_byte_value())
     def bit_and(self,opcode):
-        f = lambda x,y : Ch8Byte(x&y)
-        self.set_vx_fn_vy(opcode, f)
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        self.registers["vr"][vx].bit_and(self.registers["vr"][vy].get_byte_value())
     def bit_xor(self,opcode):
-        f = lambda x,y : Ch8Byte(x^y)
-        self.set_vx_fn_vy(opcode, f)
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        self.registers["vr"][vx].bit_xor(self.registers["vr"][vy].get_byte_value())
+    def shift_right(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        lb = self.registers["vr"][vx].shift_right()
+        self.registers["vr"][0x0F] = Ch8Byte(lb)
+    def shift_left(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        mb = self.registers["vr"][vx].shift_left()
+        self.registers["vr"][0x0F] = Ch8Byte(mb)
     def check_pygame_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
