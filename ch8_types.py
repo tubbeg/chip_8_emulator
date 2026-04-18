@@ -111,3 +111,19 @@ class Ch8Word():
             lb = self.low.get_byte_value()
             return Ch8Word().init_word(Ch8Byte(hbln), Ch8Byte(lb))
         raise Exception("not initialized")
+    def add_ch8_byte(self,ch8_byte):
+        if isinstance(ch8_byte, Ch8Byte):
+            if self.low and self.high:
+                lv = self.low.get_byte_value()
+                lh = self.high.get_byte_value()
+                tv = (lh << 8) + lv
+                tv += ch8_byte.get_byte_value()
+                if tv > 0xFFFF or tv < 0x0000:
+                    # i could just do modulo here instead
+                    raise Exception("OVERFLOW")
+                tvh = tv >> 8
+                tvl = tv & 0xFF
+                self.low = Ch8Byte(tvl)
+                self.high = Ch8Byte(tvh)
+            return
+        raise Exception("INVALID TYPE!")

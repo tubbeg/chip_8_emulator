@@ -19,4 +19,9 @@ class Instruction(str,Enum):
     SHIFTR="SHIFTR",    #8xy6
     SBCREV="SBCREV",    #8xy7
     SHIFTL="SHIFTL",    #8xye
+    IFNOTV="IFNOTV",    #9xy0
+    # Note! In AVR, JMP and RJMP refers to how many bytes the instruction is, and not
+    # if it adds any number from a register. I just really like the name RJMP
+    RJMP="RJMP",        #bnnn
+    RAND="RAND"         #cxnn
     

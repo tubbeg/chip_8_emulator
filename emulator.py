@@ -9,6 +9,8 @@ from instructions import Instruction
 from ch8_types import Ch8Byte, Ch8Word
 from memory import Memory
 from screen import Screen
+import random
+import math
 
 def is_clear(op):
     h = op.get_higher_byte().is_equal_to(0x00)
@@ -99,6 +101,13 @@ def is_shift_left(op):
     h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
     return h and last_nibble_is_e(op)
 
+def is_ifnot_v(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x9)
+    return h and last_nibble_is_zero(op)
+
+def is_rjmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xB)
+
+def is_rand(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xC)
 
 update_pygame_const = 10
 
@@ -150,8 +159,14 @@ class Emulator(ALU):
                 if is_shift_right(opcode): return Instruction.SHIFTR, opcode
                 if is_sbc_rev(opcode): return Instruction.SBCREV, opcode
                 if is_shift_left(opcode): return Instruction.SHIFTL, opcode
+                if is_ifnot_v(opcode): return Instruction.IFNOTV, opcode
+                if is_rjmp(opcode): return Instruction.RJMP, opcode
+                if is_rand(opcode): return Instruction.RAND, opcode
         return None      
     def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
+    def set_relative_pc(self, opcode):
+        nnn = opcode.get_lower_NNN()
+        self.registers["pc"] = nnn.add_ch8_byte(self.registers["pc"][0x00])
     def v_add(self, opcode):
         # does not set carry flag
         vreg = opcode.get_high_byte_lower_nibble()
@@ -224,9 +239,17 @@ class Emulator(ALU):
                 case Instruction.SHIFTR: return self.shift_right(opcode)
                 case Instruction.SBCREV: return self.sub_reverse_with_carry(opcode)
                 case Instruction.SHIFTR: return self.shift_left(opcode)
+                case Instruction.IFNOTV: return self.skip_ifnot_v(opcode)
+                case Instruction.RJMP: return self.set_relative_pc(opcode)
+                case Instruction.RAND: return self.rand(opcode)
                 case _: return
         else:
             return
+    def rand(self,opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        nn = opcode.get_lower_NN()
+        rand = math.floor(random.random() * 255)
+        self.registers["vr"][vx] = Ch8Byte(nn & rand)
     def increment_pc(self):
         self.registers["pc"].increment()
         self.registers["pc"].increment()
@@ -247,6 +270,12 @@ class Emulator(ALU):
         vy = opcode.get_low_byte_higher_nibble()
         vreg_x,vreg_y = self.registers["vr"][vx],self.registers["vr"][vy]
         if vreg_x.is_equal_to_(vreg_y.get_byte_value()):
+            self.increment_pc()
+    def skip_ifnot_v(self,opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        vreg_x,vreg_y = self.registers["vr"][vx],self.registers["vr"][vy]
+        if not vreg_x.is_equal_to_(vreg_y.get_byte_value()):
             self.increment_pc()
     def set_vx_fn_vy(self,opcode, fn):
         vx = opcode.get_high_byte_lower_nibble()
