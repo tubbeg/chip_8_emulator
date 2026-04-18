@@ -33,6 +33,9 @@ def last_nibble_is_three(op):
 def last_nibble_is_four(op):
     return last_nibble_is_nr(op,0x4)
 
+def last_nibble_is_five(op):
+    return last_nibble_is_nr(op,0x5)
+
 def is_jmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x1)
 
 def is_if(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x3)
@@ -70,6 +73,10 @@ def is_xor(op):
 def is_add_with_carry(op):
     h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
     return h and last_nibble_is_four(op)
+
+def is_sub_with_carry(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_five(op)
 
 update_pygame_const = 10
 
@@ -117,6 +124,7 @@ class Emulator(ALU):
                 if is_or(opcode): return Instruction.OR, opcode
                 if is_xor(opcode): return Instruction.OR, opcode
                 if is_add_with_carry(opcode): return Instruction.ADC, opcode
+                if is_sub_with_carry(opcode): return Instruction.SBC, opcode
         return None      
     def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
     def v_add(self, opcode):
@@ -128,6 +136,12 @@ class Emulator(ALU):
         vy = opcode.get_low_byte_higher_nibble()
         vreg_y = self.registers["vr"][vy]
         carry_flag = self.registers["vr"][vx].add_with_carry(vreg_y.to_byte_value())
+        self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
+    def sub_with_carry(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        vreg_y = self.registers["vr"][vy]
+        carry_flag = self.registers["vr"][vx].sub_with_carry(vreg_y.to_byte_value())
         self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
     def set_vreg(self,opcode):
         vreg = opcode.get_high_byte_lower_nibble()
@@ -175,6 +189,7 @@ class Emulator(ALU):
                 case Instruction.AND: return self.bit_and(opcode)
                 case Instruction.XOR: return self.bit_xor(opcode)
                 case Instruction.ADC: return self.add_with_carry(opcode)
+                case Instruction.SBC: return self.sub_with_carry(opcode)
                 case _: return
         else:
             return

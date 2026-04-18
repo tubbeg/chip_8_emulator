@@ -37,6 +37,11 @@ class Ch8Byte():
         carry_flag = self._byte > 255 or self._byte < 0
         self._byte = self._byte % 255
         return int(carry_flag)
+    def sub_with_carry(self,nr):
+        self._byte -= nr
+        carry_flag = self._byte > 255 or self._byte < 0
+        self._byte = self._byte % 255
+        return int(not carry_flag) # carry flag is set to zero if vx >= vy
 
 class Ch8Word():
     def __init__(self) -> None:
