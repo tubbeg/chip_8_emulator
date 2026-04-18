@@ -12,6 +12,25 @@ from screen import Screen
 import random
 import math
 
+input_map = {
+    0x0 : pygame.K_SPACE,
+    0x1 : pygame.K_KP1,
+    0x2 : pygame.K_KP2,
+    0x3 : pygame.K_KP3,
+    0x4 : pygame.K_KP4,
+    0x5 : pygame.K_KP5,
+    0x6 : pygame.K_KP6,
+    0x7 : pygame.K_KP7,
+    0x8 : pygame.K_KP8,
+    0x9 : pygame.K_KP9,
+    0xA : pygame.K_q,
+    0xB : pygame.K_w,
+    0xC : pygame.K_e,
+    0xD : pygame.K_r,
+    0xE : pygame.K_t,
+    0xF : pygame.K_y,
+}
+
 def is_clear(op):
     h = op.get_higher_byte().is_equal_to(0x00)
     l = op.get_lower_byte().is_equal_to(0xe0)
@@ -44,8 +63,14 @@ def last_nibble_is_six(op):
 def last_nibble_is_seven(op):
     return last_nibble_is_nr(op,0x7)
 
+def last_nibble_is_eight(op):
+    return last_nibble_is_nr(op,0x8)
+
 def last_nibble_is_e(op):
     return last_nibble_is_nr(op,0xE)
+
+def last_nibble_is_a(op):
+    return last_nibble_is_nr(op,0xA)
 
 def is_jmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x1)
 
@@ -61,45 +86,31 @@ def is_set(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x6)
 
 def is_add(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x7)
 
-def is_setv(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_zero(op)
+def first_nibble_is_eight(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+
+def first_nibble_is_f(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xF)
+
+def is_setv(op): return first_nibble_is_eight(op) and last_nibble_is_zero(op)
 
 def is_seti(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xA)
 
 def is_draw(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xD)
 
-def is_or(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_one(op)
+def is_or(op): return first_nibble_is_eight(op) and last_nibble_is_one(op)
 
-def is_and(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_two(op)
+def is_and(op): return first_nibble_is_eight(op) and last_nibble_is_two(op)
 
-def is_xor(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_three(op)
+def is_xor(op): return first_nibble_is_eight(op) and last_nibble_is_three(op)
 
-def is_add_with_carry(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_four(op)
+def is_add_with_carry(op): return first_nibble_is_eight(op) and last_nibble_is_four(op)
 
-def is_sub_with_carry(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_five(op)
+def is_sub_with_carry(op): return first_nibble_is_eight(op) and last_nibble_is_five(op)
 
-def is_shift_right(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_six(op)
+def is_shift_right(op): return first_nibble_is_eight(op) and last_nibble_is_six(op)
 
-def is_sbc_rev(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_seven(op)
+def is_sbc_rev(op): return first_nibble_is_eight(op) and last_nibble_is_seven(op)
 
-def is_shift_left(op):
-    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
-    return h and last_nibble_is_e(op)
+def is_shift_left(op): return first_nibble_is_eight(op) and last_nibble_is_e(op)
 
 def is_ifnot_v(op):
     h = op.get_higher_byte().higher_nibble_is_equal_to(0x9)
@@ -108,6 +119,32 @@ def is_ifnot_v(op):
 def is_rjmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xB)
 
 def is_rand(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xC)
+
+def is_if_key(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0xe)
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x9)
+    return h and lhn and last_nibble_is_e(op)
+
+def is_ifnot_key(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0xe)
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0xa)
+    return h and lhn and last_nibble_is_one(op)
+
+def is_get_delay(op):
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x0)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_seven(op)
+
+def is_get_key(op):
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x0)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_a(op)
+
+def is_set_delay(op):
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x1)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_five(op)
+
+def is_sound(op):
+    lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x1)
+    return first_nibble_is_f(op) and lhn and last_nibble_is_eight(op)
 
 update_pygame_const = 10
 
@@ -133,6 +170,7 @@ class Emulator(ALU):
         self.save_checkpoint = False
         self.instruction_history = []
         self.update_freq = update_pygame_const
+        self.input_keys = []
     def read_rom(self, path):
         with open(path, "rb") as f:
             self.file_contents = f.read()
@@ -162,6 +200,12 @@ class Emulator(ALU):
                 if is_ifnot_v(opcode): return Instruction.IFNOTV, opcode
                 if is_rjmp(opcode): return Instruction.RJMP, opcode
                 if is_rand(opcode): return Instruction.RAND, opcode
+                if is_if_key(opcode): return Instruction.IFKEY, opcode
+                if is_ifnot_key(opcode): return Instruction.IFNKEY, opcode
+                if is_get_delay(opcode): return Instruction.GDELAY, opcode
+                if is_get_key(opcode): return Instruction.GKEY, opcode
+                if is_set_delay(opcode): return Instruction.SDELAY, opcode
+                if is_sound(opcode): return Instruction.SOUND, opcode
         return None      
     def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
     def set_relative_pc(self, opcode):
@@ -242,9 +286,51 @@ class Emulator(ALU):
                 case Instruction.IFNOTV: return self.skip_ifnot_v(opcode)
                 case Instruction.RJMP: return self.set_relative_pc(opcode)
                 case Instruction.RAND: return self.rand(opcode)
+                case Instruction.IFKEY: return self.ifkey(opcode)
+                case Instruction.IFNKEY: return self.ifnkey(opcode)
+                case Instruction.GDELAY: return self.get_delay(opcode)
+                case Instruction.GKEY: return self.get_key(opcode)
+                case Instruction.SDELAY: return self.set_delay(opcode)
+                case Instruction.SOUND: return self.set_sound(opcode)
                 case _: return
         else:
             return
+    def set_sound(self,opcode):
+        raise Exception("NOT YET IMPLEMENTED")
+    def set_delay(self,opcode):
+        raise Exception("NOT YET IMPLEMENTED")
+    def get_key(self,opcode):
+        # timers will continue in the background here
+        raise Exception("NOT YET IMPLEMENTED")
+    def get_delay(self,opcode):
+        # should timers update at the same rate as the pygame screen?
+        raise Exception("NOT YET IMPLEMENTED")
+    def ifkey(self,opcode):
+        # does not seem like the list is retaining the keys for very long so I'm wondering
+        # how this is going to work
+        try:
+            vx = opcode.get_high_byte_lower_nibble()
+            v = self.registers["vr"][vx].to_byte_value()
+            k = input_map[v]
+            for ik in self.input_keys:
+                if ik == k:
+                    self.increment_pc()
+                    return None
+            return None
+        except:
+            return None
+    def ifnkey(self,opcode):
+        try:
+            vx = opcode.get_high_byte_lower_nibble()
+            v = self.registers["vr"][vx].to_byte_value()
+            k = input_map[v]
+            for ik in self.input_keys:
+                if not ik == k:
+                    self.increment_pc()
+                    return None
+            return None
+        except:
+            return None
     def rand(self,opcode):
         vx = opcode.get_high_byte_lower_nibble()
         nn = opcode.get_lower_NN()
@@ -308,8 +394,18 @@ class Emulator(ALU):
         vx = opcode.get_high_byte_lower_nibble()
         mb = self.registers["vr"][vx].shift_left()
         self.registers["vr"][0x0F] = Ch8Byte(mb)
+    def set_input_keys(self,event):
+        kl = []
+        if event.type == pygame.KEYDOWN:
+            kl.append(event.key)
+        if event.type == pygame.KEYUP:
+            for kd in self.input_keys:
+                if not kd == event.key:
+                    kl.append(kd)
+        self.input_keys = kl
     def check_pygame_events(self):
         for event in pygame.event.get():
+            self.set_input_keys(event)
             if event.type == pygame.QUIT:
                 self.run_program = False
     def update_pygame(self):

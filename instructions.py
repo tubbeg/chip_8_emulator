@@ -23,5 +23,12 @@ class Instruction(str,Enum):
     # Note! In AVR, JMP and RJMP refers to how many bytes the instruction is, and not
     # if it adds any number from a register. I just really like the name RJMP
     RJMP="RJMP",        #bnnn
-    RAND="RAND"         #cxnn
+    RAND="RAND",        #cxnn
+    IFKEY="IFKEY",      #ex9e
+    IFNKEY="IFNKEY",    #exa1
+    GDELAY="GDELAY",    #fx07
+    GKEY="GKEY",        #fx0a
+    SDELAY="SDELAY"     #fx15
+    SOUND="SOUND"       #fx18
+
     
