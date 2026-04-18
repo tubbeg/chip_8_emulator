@@ -9,6 +9,8 @@ class Instruction(str,Enum):
     DRAW="DRAW",        #dxyn
     IF="IF",            #3xnn
     IFNOT="IFNOT",      #4xnn
-    IFV="IFV"           #5xy0
-    SETV="SETV"         #8xy0
+    IFV="IFV",          #5xy0
+    SETV="SETV",        #8xy0
+    OR="OR",            #8xy1
+    AND="AND"           #8xy2
 

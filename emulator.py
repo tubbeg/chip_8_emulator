@@ -15,8 +15,17 @@ def is_clear(op):
     l = op.get_lower_byte().is_equal_to(0xe0)
     return h and l
 
+def last_nibble_is_nr(op,nr):
+    return op.get_higher_byte().lower_nibble_is_equal_to(nr)
+
 def last_nibble_is_zero(op):
-    return op.get_higher_byte().lower_nibble_is_equal_to(0x0)
+    return last_nibble_is_nr(op,0x0)
+
+def last_nibble_is_one(op):
+    return last_nibble_is_nr(op,0x1)
+
+def last_nibble_is_two(op):
+    return last_nibble_is_nr(op,0x2)
 
 def is_jmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x1)
 
@@ -40,9 +49,15 @@ def is_seti(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xA)
 
 def is_draw(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xD)
 
+def is_or(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_one(op)
+
+def is_and(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_two(op)
 
 update_pygame_const = 10
-
 
 DEBUG = False
 
@@ -85,6 +100,7 @@ class Emulator(ALU):
                 if is_setv(opcode): return Instruction.SETV,opcode
                 if is_seti(opcode): return Instruction.SETI,opcode
                 if is_draw(opcode): return Instruction.DRAW,opcode
+                if is_or(opcode): return Instruction.OR, opcode
         return None      
     def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
     def v_add(self, opcode):
@@ -133,6 +149,8 @@ class Emulator(ALU):
                 case Instruction.SETV: return self.set_v(opcode)
                 case Instruction.SETI: return self.set_i(opcode)
                 case Instruction.DRAW: return self.draw(opcode)
+                case Instruction.OR: return self.bit_or(opcode)
+                case Instruction.AND: return self.bit_and(opcode)
                 case _: return
         else:
             return
@@ -157,11 +175,21 @@ class Emulator(ALU):
         vreg_x,vreg_y = self.registers["vr"][vx],self.registers["vr"][vy]
         if vreg_x.is_equal_to_(vreg_y.get_byte_value()):
             self.increment_pc()
-    def set_v(self, opcode):
+    def set_vx_fn_vy(self,opcode, fn):
         vx = opcode.get_high_byte_lower_nibble()
         vy = opcode.get_low_byte_higher_nibble()
         val_y = self.registers["vr"][vy].get_byte_value()
-        self.registers["vr"][vx] = Ch8Byte(val_y)
+        val_x = self.registers["vr"][vx].get_byte_value()
+        self.registers["vr"][vx] = fn(val_x,val_y)
+    def set_v(self, opcode):
+        f = lambda x,y : Ch8Byte(y)
+        self.set_vx_fn_vy(opcode, f)
+    def bit_or(self,opcode):
+        f = lambda x,y : Ch8Byte(x|y)
+        self.set_vx_fn_vy(opcode, f)
+    def bit_and(self,opcode):
+        f = lambda x,y : Ch8Byte(x&y)
+        self.set_vx_fn_vy(opcode, f)
     def check_pygame_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
