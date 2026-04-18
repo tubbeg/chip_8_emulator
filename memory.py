@@ -25,3 +25,18 @@ class Memory():
             return Ch8Word().init_word(high,low)
         except:
             raise Exception("pc at: ", type(pc))
+    def try_get_registers_memory(self, index):
+        try:
+            return self._memory[index:index + 0x0F]
+        except:
+            raise Exception(index, "index")
+    def try_store_registers_memory(self, index, registers):
+        try:
+            i = 0
+            for r in registers:
+                self._memory[index + i] = r
+                i += 1
+            return None
+        except:
+            raise Exception(index, "index")
+

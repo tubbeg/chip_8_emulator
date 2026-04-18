@@ -124,12 +124,9 @@ def is_rjmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xB)
 def is_rand(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xC)
 
 def is_if_key(op):
-    print("here here")
     h = op.get_higher_byte().higher_nibble_is_equal_to(0xe)
     lhn = op.get_lower_byte().higher_nibble_is_equal_to(0x9)
     ret = h and lhn and last_nibble_is_e(op)
-    print(op.get_word_value())
-    print(hex(op.get_word_value()), ret)
     return ret
 
 def is_ifnot_key(op):
@@ -179,7 +176,7 @@ def is_ret(op): return op.get_word_value() == 0x00ee
 
 update_pygame_const = 10
 
-DEBUG = True
+DEBUG = False
 
 # arithmetic logic unit, the basis of every processor
 class ALU():
@@ -223,8 +220,9 @@ class Emulator(ALU):
                 if is_setv(opcode): return Instruction.SETV,opcode
                 if is_seti(opcode): return Instruction.SETI,opcode
                 if is_draw(opcode): return Instruction.DRAW,opcode
+                if is_and(opcode): return Instruction.AND, opcode
                 if is_or(opcode): return Instruction.OR, opcode
-                if is_xor(opcode): return Instruction.OR, opcode
+                if is_xor(opcode): return Instruction.XOR, opcode
                 if is_add_with_carry(opcode): return Instruction.ADC, opcode
                 if is_sub_with_carry(opcode): return Instruction.SBC, opcode
                 if is_shift_right(opcode): return Instruction.SHIFTR, opcode
@@ -260,20 +258,20 @@ class Emulator(ALU):
         vx = opcode.get_high_byte_lower_nibble()
         vy = opcode.get_low_byte_higher_nibble()
         vreg_y = self.registers["vr"][vy]
-        carry_flag = self.registers["vr"][vx].add_with_carry(vreg_y.to_byte_value())
-        self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
+        carry_flag = self.registers["vr"][vx].add_with_carry(vreg_y.get_byte_value())
+        self.registers["vr"][0x0F - 1] = Ch8Byte(carry_flag)
     def sub_with_carry(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
         vy = opcode.get_low_byte_higher_nibble()
         vreg_y = self.registers["vr"][vy]
-        carry_flag = self.registers["vr"][vx].sub_with_carry(vreg_y.to_byte_value())
-        self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
+        carry_flag = self.registers["vr"][vx].sub_with_carry(vreg_y.get_byte_value())
+        self.registers["vr"][0x0F - 1] = Ch8Byte(carry_flag)
     def sub_reverse_with_carry(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
         vy = opcode.get_low_byte_higher_nibble()
         vreg_y = self.registers["vr"][vy]
-        carry_flag = self.registers["vr"][vx].sub_rev_with_carry(vreg_y.to_byte_value())
-        self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
+        carry_flag = self.registers["vr"][vx].sub_rev_with_carry(vreg_y.get_byte_value())
+        self.registers["vr"][0x0F - 1] = Ch8Byte(carry_flag)
     def set_vreg(self,opcode):
         vreg = opcode.get_high_byte_lower_nibble()
         self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
@@ -282,9 +280,9 @@ class Emulator(ALU):
         self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
     def set_i(self,opcode): self.registers["i"] = opcode.get_lower_NNN() # FYI, returns new instance
     def set_carry_flag(self):
-        self.registers["vr"][0x0F] = Ch8Byte(1)
+        self.registers["vr"][0x0F - 1] = Ch8Byte(1)
     def reset_carry_flag(self):
-        self.registers["vr"][0x0F] = Ch8Byte(0)
+        self.registers["vr"][0x0F - 1] = Ch8Byte(0)
     def draw(self, opcode):
         if self.memory:
             index = self.registers["i"].get_word_value()
@@ -357,11 +355,20 @@ class Emulator(ALU):
     def bcd(self,opcode):
         raise Exception("NOT YET IMPLEMENTED")
     def store(self,opcode):
-        raise Exception("NOT YET IMPLEMENTED")
+        if self.memory:
+            index = self.registers["i"].get_word_value()
+            self.memory.try_store_registers_memory(index, self.registers["vr"])
+            return None
+        raise Exception("Not initialized")
     def reload(self,opcode):
-        raise Exception("NOT YET IMPLEMENTED")
+        if self.memory:
+            index = self.registers["i"].get_word_value()
+            self.registers["vr"] = self.memory.try_get_registers_memory(index)
+            return None
+        raise Exception("Not initialized")
     def add_i(self,opcode):
-        raise Exception("NOT YET IMPLEMENTED")
+        vx = opcode.get_high_byte_lower_nibble()
+        self.registers["i"].add_ch8_byte(self.registers["vr"][vx])
     def set_sound(self,opcode):
         raise Exception("NOT YET IMPLEMENTED")
     def set_delay(self,opcode):
@@ -416,19 +423,19 @@ class Emulator(ALU):
     def skip_if_not_opcode(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
         nn = opcode.get_lower_NN()
-        if not self.registers["vr"][vx].is_equal_to(nn): #if not -> skip next ins
+        if not self.registers["vr"][vx - 1].is_equal_to(nn): #if not -> skip next ins
             self.increment_pc()
     def skip_if_v_opcode(self,opcode):
         vx = opcode.get_high_byte_lower_nibble()
         vy = opcode.get_low_byte_higher_nibble()
         vreg_x,vreg_y = self.registers["vr"][vx],self.registers["vr"][vy]
-        if vreg_x.is_equal_to_(vreg_y.get_byte_value()):
+        if vreg_x.is_equal_to(vreg_y.get_byte_value()):
             self.increment_pc()
     def skip_ifnot_v(self,opcode):
         vx = opcode.get_high_byte_lower_nibble()
         vy = opcode.get_low_byte_higher_nibble()
         vreg_x,vreg_y = self.registers["vr"][vx],self.registers["vr"][vy]
-        if not vreg_x.is_equal_to_(vreg_y.get_byte_value()):
+        if not vreg_x.is_equal_to(vreg_y.get_byte_value()):
             self.increment_pc()
     def set_vx_fn_vy(self,opcode, fn):
         vx = opcode.get_high_byte_lower_nibble()
@@ -456,11 +463,11 @@ class Emulator(ALU):
     def shift_right(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
         lb = self.registers["vr"][vx].shift_right()
-        self.registers["vr"][0x0F] = Ch8Byte(lb)
+        self.registers["vr"][0x0F - 1] = Ch8Byte(lb)
     def shift_left(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
         mb = self.registers["vr"][vx].shift_left()
-        self.registers["vr"][0x0F] = Ch8Byte(mb)
+        self.registers["vr"][0x0F - 1] = Ch8Byte(mb)
     def set_input_keys(self,event):
         kl = []
         if event.type == pygame.KEYDOWN:

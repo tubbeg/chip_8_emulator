@@ -4,12 +4,14 @@ import json
 screen_max_x = 32 #  8x8 bits
 screen_max_y = 64 # 8x4 bits
 
+def gen_key_string(x,y):
+    return "k" + "x" + str(x) + "y" + str(y)
 
 def default_screen():
     screen = {}
     for i in range(0,screen_max_y):
         for j in range(0,screen_max_x):
-            s = "k" + str(i) + ";" + str(j)
+            s = gen_key_string(i,j)
             screen[s] = False
     return screen
 
@@ -34,22 +36,28 @@ class Screen():
         x,y = x_init,y_init
         for i in range(0,screen_max_x):
             for j in range(0,screen_max_y):
-                self.draw_pygame_pixel(y,x, 7, 7, self._screen[self.get_key_str(j,i)])
+                self.draw_pygame_pixel(y,x, 7, 7, self._screen[gen_key_string(j,i)])
                 y += 8
             y = y_init
             x += 8
         pygame.display.flip()
-    def get_key_str(self,x,y):
-        return "k" + str(x) + ";" + str(y)
     def init_screen(self):
         self.game_screen = pygame.display.set_mode((800, 600))
         self._screen = default_screen()
     def clear(self):
         self._screen = default_screen()
     def xor_bit(self,x,y, bit):
-        current = self._screen[self.get_key_str(x,y)]
+        ## This is actually hilarious.
+        ## You might think to yourself: "should it not be 'y > screen_max_y' ?"
+        ## But nope, that would not work. The x and y are inverted for some reason
+        if y >= screen_max_x:
+            y = y % screen_max_x
+        if x >= screen_max_y:
+            x = x % screen_max_y
+        k = gen_key_string(x,y)
+        current = self._screen[k]
         next = (current and not bit) or (not current and bit) # xor operation
-        self._screen[self.get_key_str(x,y)] = next
+        self._screen[gen_key_string(x,y)] = next
         return not next and current # carry flag
     def draw_byte(self, x,y, byte):
         x_pos = x
