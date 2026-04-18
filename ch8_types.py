@@ -32,6 +32,11 @@ class Ch8Byte():
         return False
     def bit_is_set(self,nth):
         return (self._byte & (1<<nth)) > 0
+    def add_with_carry(self,nr):
+        self._byte += nr
+        carry_flag = self._byte > 255 or self._byte < 0
+        self._byte = self._byte % 255
+        return int(carry_flag)
 
 class Ch8Word():
     def __init__(self) -> None:

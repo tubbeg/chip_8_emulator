@@ -12,5 +12,7 @@ class Instruction(str,Enum):
     IFV="IFV",          #5xy0
     SETV="SETV",        #8xy0
     OR="OR",            #8xy1
-    AND="AND"           #8xy2
-
+    AND="AND",          #8xy2
+    XOR="XOR",          #8xy3
+    ADC="ADC"           #8xy4
+    

@@ -27,6 +27,12 @@ def last_nibble_is_one(op):
 def last_nibble_is_two(op):
     return last_nibble_is_nr(op,0x2)
 
+def last_nibble_is_three(op):
+    return last_nibble_is_nr(op,0x3)
+
+def last_nibble_is_four(op):
+    return last_nibble_is_nr(op,0x4)
+
 def is_jmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x1)
 
 def is_if(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x3)
@@ -56,6 +62,14 @@ def is_or(op):
 def is_and(op):
     h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
     return h and last_nibble_is_two(op)
+
+def is_xor(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_three(op)
+
+def is_add_with_carry(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_four(op)
 
 update_pygame_const = 10
 
@@ -101,12 +115,20 @@ class Emulator(ALU):
                 if is_seti(opcode): return Instruction.SETI,opcode
                 if is_draw(opcode): return Instruction.DRAW,opcode
                 if is_or(opcode): return Instruction.OR, opcode
+                if is_xor(opcode): return Instruction.OR, opcode
+                if is_add_with_carry(opcode): return Instruction.ADC, opcode
         return None      
     def set_pc(self, opcode): self.registers["pc"] = opcode.get_lower_NNN()
     def v_add(self, opcode):
         # does not set carry flag
         vreg = opcode.get_high_byte_lower_nibble()
         self.registers["vr"][vreg].add_byte(opcode.get_lower_NN())
+    def add_with_carry(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        vreg_y = self.registers["vr"][vy]
+        carry_flag = self.registers["vr"][vx].add_with_carry(vreg_y.to_byte_value())
+        self.registers["vr"][0x0F] = Ch8Byte(carry_flag)
     def set_vreg(self,opcode):
         vreg = opcode.get_high_byte_lower_nibble()
         self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
@@ -151,6 +173,8 @@ class Emulator(ALU):
                 case Instruction.DRAW: return self.draw(opcode)
                 case Instruction.OR: return self.bit_or(opcode)
                 case Instruction.AND: return self.bit_and(opcode)
+                case Instruction.XOR: return self.bit_xor(opcode)
+                case Instruction.ADC: return self.add_with_carry(opcode)
                 case _: return
         else:
             return
@@ -189,6 +213,9 @@ class Emulator(ALU):
         self.set_vx_fn_vy(opcode, f)
     def bit_and(self,opcode):
         f = lambda x,y : Ch8Byte(x&y)
+        self.set_vx_fn_vy(opcode, f)
+    def bit_xor(self,opcode):
+        f = lambda x,y : Ch8Byte(x^y)
         self.set_vx_fn_vy(opcode, f)
     def check_pygame_events(self):
         for event in pygame.event.get():
