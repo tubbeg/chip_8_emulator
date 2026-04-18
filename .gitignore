@@ -1,4 +1,5 @@
 *.txt
 *.ch8
 *.json
+*.asm
 __pycache__/

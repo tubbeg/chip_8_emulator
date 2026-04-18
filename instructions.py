@@ -7,7 +7,8 @@ class Instruction(str,Enum):
     ADD="ADD",          #7xyn
     SETI="SETI",        #annn 
     DRAW="DRAW",        #dxyn
-    IFNOT="IFNOT",      #3xnn
-    IF="IF",            #4xnn
-    IFNOTV="IFNOTV"     #5xy0
+    IF="IF",            #3xnn
+    IFNOT="IFNOT",      #4xnn
+    IFV="IFV"           #5xy0
+    SETV="SETV"         #8xy0
 

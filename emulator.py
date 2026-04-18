@@ -15,15 +15,32 @@ def is_clear(op):
     l = op.get_lower_byte().is_equal_to(0xe0)
     return h and l
 
+def last_nibble_is_zero(op):
+    return op.get_higher_byte().lower_nibble_is_equal_to(0x0)
+
 def is_jmp(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x1)
+
+def is_if(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x3)
+
+def is_ifnot(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x4)
+
+def is_ifv(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x5)
+    return h and last_nibble_is_zero(op)
 
 def is_set(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x6)
 
 def is_add(op): return op.get_higher_byte().higher_nibble_is_equal_to(0x7)
 
+def is_setv(op):
+    h = op.get_higher_byte().higher_nibble_is_equal_to(0x8)
+    return h and last_nibble_is_zero(op)
+
 def is_seti(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xA)
 
 def is_draw(op): return op.get_higher_byte().higher_nibble_is_equal_to(0xD)
+
+
 
 DEBUG = False
 
@@ -57,8 +74,12 @@ class Emulator(ALU):
             if opcode := self.memory.try_get_opcode_memory(self.registers["pc"]):
                 if is_clear(opcode):return Instruction.CLEAR,opcode
                 if is_jmp(opcode): return Instruction.JMP,opcode
+                if is_if(opcode): return Instruction.IF,opcode
+                if is_ifv(opcode): return Instruction.IFV,opcode
+                if is_ifnot(opcode): return Instruction.IFNOT,opcode
                 if is_set(opcode): return Instruction.SET,opcode
                 if is_add(opcode): return Instruction.ADD,opcode
+                if is_setv(opcode): return Instruction.SETV,opcode
                 if is_seti(opcode): return Instruction.SETI,opcode
                 if is_draw(opcode): return Instruction.DRAW,opcode
         return None      
@@ -113,19 +134,27 @@ class Emulator(ALU):
         self.registers["pc"].increment()
         if self.registers["pc"].get_word_value() > 0xFFF: # out of memory
             self.registers["pc"] = Ch8Word().init_word(Ch8Byte(0), Ch8Byte(0))
-    def skip_if_not_opcode(self, opcode):
-        vx = opcode.get_high_byte_lower_nibble()
-        if not self.registers["vr"][vx].is_equal_to(opcode.get_lower_NN()):
-            self.increment_pc() #skips the next instruction
     def skip_if_opcode(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
-        if not self.registers["vr"][vx].is_equal_to(opcode.get_lower_NN()):
+        nn = opcode.get_lower_NN()
+        if self.registers["vr"][vx].is_equal_to(nn): #if -> skip next ins
+            self.increment_pc()
+    def skip_if_not_opcode(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        nn = opcode.get_lower_NN()
+        if not self.registers["vr"][vx].is_equal_to(nn): #if not -> skip next ins
             self.increment_pc()
     def skip_if_v_opcode(self,opcode):
-        vx = self.registers["vr"][opcode.get_high_byte_lower_nibble()]
-        vy = self.registers["vr"][opcode.get_lower_NN()]
-        if vx.is_equal_to(vy.get_byte_value()):
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        vreg_x,vreg_y = self.registers["vr"][vx],self.registers["vr"][vy]
+        if vreg_x.is_equal_to_(vreg_y.get_byte_value()):
             self.increment_pc()
+    def set_v(self, opcode):
+        vx = opcode.get_high_byte_lower_nibble()
+        vy = opcode.get_low_byte_higher_nibble()
+        val_y = self.registers["vr"][vy].get_byte_value()
+        self.registers["vr"][vx] = Ch8Byte(val_y)
     def _check_pygame_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

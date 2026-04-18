@@ -16,7 +16,7 @@ class Memory():
             try:
                 return self._memory[index:index + number_of_bytes]
             except:
-                raise Exception()
+                raise Exception(index, "index")
     def try_get_opcode_memory(self,pc):
         try:
             nr = pc.get_word_value()
