@@ -274,11 +274,11 @@ class Emulator(ALU):
         carry_flag = self.registers["vr"][vx].sub_rev_with_carry(vreg_y.get_byte_value())
         self.registers["vr"][0x0F - 1] = Ch8Byte(carry_flag)
     def set_vreg(self,opcode):
-        vreg = opcode.get_high_byte_lower_nibble()
-        self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
+        vx = opcode.get_high_byte_lower_nibble()
+        self.registers["vr"][vx - 1] = Ch8Byte(opcode.get_lower_NN())
     def set_vreg_from_vreg(self,opcode):
-        vreg = opcode.get_high_byte_lower_nibble()
-        self.registers["vr"][vreg] = Ch8Byte(opcode.get_lower_NN())
+        vx = opcode.get_high_byte_lower_nibble()
+        self.registers["vr"][vx - 1] = Ch8Byte(opcode.get_lower_NN())
     def set_i(self,opcode): self.registers["i"] = opcode.get_lower_NNN() # FYI, returns new instance
     def set_carry_flag(self):
         self.registers["vr"][0x0F - 1] = Ch8Byte(1)
