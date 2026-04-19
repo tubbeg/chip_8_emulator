@@ -1,8 +1,7 @@
 
 ## CHIP-8 Emulator
 
-
-![image info](./demo.webm.mp4)
+<video src="demo.webm.mp4" width="320" height="240" controls></video>
 
 ### What is this?
 
@@ -14,7 +13,7 @@ This is an emulator for the CHIP-8. Technically speaking, it's not a true emulat
 
 Many ROMs are already working despite the fact that not every instruction has been implemented.
 
-It can the run the 'IBM Logo' program. You can find the program by searching 'IBM Logo CHIP-8' in your favourite search engine.
+For a simple demo: try the 'IBM Logo' program, which you can find by searching 'IBM Logo CHIP-8' in your favourite search engine.
 
 ### What's missing?
 
