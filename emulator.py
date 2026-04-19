@@ -201,6 +201,7 @@ class Emulator(ALU):
         self.update_freq = update_pygame_const
         self.input_keys = []
         self.stack = []
+        self.delay_timer = None
     def read_rom(self, path):
         with open(path, "rb") as f:
             self.file_contents = f.read()
@@ -305,7 +306,6 @@ class Emulator(ALU):
             instruction, opcode = result
             if DEBUG:
                 print(instruction)
-            print(instruction)
             match instruction:
                 case Instruction.CLEAR: return self.screen.clear()
                 case Instruction.JMP: return self.set_pc(opcode)
@@ -353,8 +353,6 @@ class Emulator(ALU):
         self.registers["pc"] = opcode.get_lower_NNN()
     def setiv(self,opcode):
         vx = opcode.get_high_byte_lower_nibble()
-        print("reg is", vx)
-        print("type of reg", self.registers["vr"][vx], type(self.registers["vr"][vx]))
         vreg_x = self.registers["vr"][vx].get_byte_value()
         self.registers["i"] = Ch8Word().init_word(Ch8Byte(0), Ch8Byte(vreg_x))
     def bcd(self,opcode):
@@ -383,7 +381,9 @@ class Emulator(ALU):
     def set_sound(self,opcode):
         raise Exception("NOT YET IMPLEMENTED")
     def set_delay(self,opcode):
-        raise Exception("NOT YET IMPLEMENTED")
+        vx = opcode.get_high_byte_lower_nibble()
+        vreg_x = self.registers["vr"][vx].get_byte_value()
+        self.delay_timer = vreg_x
     def get_key(self,opcode):
         # timers will continue in the background here
         raise Exception("NOT YET IMPLEMENTED")
@@ -429,7 +429,7 @@ class Emulator(ALU):
     def skip_if_opcode(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
         nn = opcode.get_lower_NN()
-        if self.registers["vr"][vx].is_equal_to(nn): #if -> skip next ins
+        if self.registers["vr"][vx - 1].is_equal_to(nn): #if -> skip next ins
             self.increment_pc()
     def skip_if_not_opcode(self, opcode):
         vx = opcode.get_high_byte_lower_nibble()
@@ -500,13 +500,17 @@ class Emulator(ALU):
         if self.update_freq < 1:
             dt = self.game_clock.tick(60) 
             self.update_freq = update_pygame_const
+    def thread_update_time(self):
+        if self.delay_timer:
+            self.delay_timer -= self.delay_timer
+            print("hello", self.delay_timer)
+        if self.run_program:
+            threading.Timer(.5, self.thread_update_time).start()
     def run_cpu_loop(self):
         if self.memory:
             self.screen.init_screen()
+            self.thread_update_time()
             while self.run_program:
-                for r in self.registers["vr"]:
-                    if not isinstance(r,Ch8Byte):
-                        raise Exception()
                 opcode = self.get_instruction() # decode opcode/fetch instruction
                 self.increment_pc()
                 self.execute_instruction(opcode) # execute instruction
