@@ -305,7 +305,6 @@ class Emulator(ALU):
             instruction, opcode = result
             if DEBUG:
                 print(instruction)
-            print(instruction)
             match instruction:
                 case Instruction.CLEAR: return self.screen.clear()
                 case Instruction.JMP: return self.set_pc(opcode)

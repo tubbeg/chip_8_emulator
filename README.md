@@ -1,24 +1,25 @@
 
 ## CHIP-8 Emulator
 
-![image info](./example_image.png)
+
+![image info](./demo.webm.mp4)
 
 ### What is this?
 
 This is an emulator for the CHIP-8. Technically speaking, it's not a true emulator since it does not emulate physical hardware. So it's actually closer to an interpreter.
 
+![image info](./example_image.png)
+
 ### What can it do?
 
-Only one program! It can the run the 'IBM Logo' program which displays the IBM logo. Exciting, isn't it?
+Many ROMs are already working despite the fact that not every instruction has been implemented.
 
-You can find the program by searching 'IBM Logo CHIP-8' in your favourite search engine.
+It can the run the 'IBM Logo' program. You can find the program by searching 'IBM Logo CHIP-8' in your favourite search engine.
 
 ### What's missing?
 
-So far I've implemented 6 out of 35 instructions. And I am still not 100 % on the drawing function.
-
-Work In Progress!
-
+Sound, input, and delay timers remain to be implemented.
+s
 ### How do I run this?
 
 1. Install the latest version of python and git
