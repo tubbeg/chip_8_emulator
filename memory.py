@@ -22,10 +22,6 @@ e = [0xF0, 0x80, 0xF0, 0x80, 0xF0]
 f = [0xF0, 0x80, 0xF0, 0x80, 0x80]
 fonts = [zero,one,two,three,four,five,six,seven,eight,nine,a,b,c,d,e,f]
 
-
-def is_in_range(try_nr, min,max):
-    return try_nr >= min and try_nr <= max
-
 class Memory():
     def __init__(self, ba) -> None:
         self._memory = []

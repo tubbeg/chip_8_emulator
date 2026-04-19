@@ -20,7 +20,7 @@ For a simple demo: try the 'IBM Logo' program, which you can find by searching '
 ### What's missing?
 
 Sound, input, and delay timers remain to be implemented.
-s
+
 ### How do I run this?
 
 1. Install the latest version of python and git
