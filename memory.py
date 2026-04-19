@@ -3,6 +3,29 @@ from ch8_types import Ch8Byte, Ch8Word
 # big endian
 # 16b v registers, one program counter (16-bit), one memory (index) register 12 bit
 
+# font data
+zero = [0xF0,0x90,0x90,0x90,0xF0]
+one = [0x20, 0x60, 0x20, 0x20, 0x70]
+two = [0x20, 0x60, 0x20, 0x20, 0x70]
+three = [0xF0, 0x10, 0xF0, 0x80, 0xF0]
+four = [0x90, 0x90, 0xF0, 0x10, 0x10]
+five = [0xF0, 0x80, 0xF0, 0x10, 0xF0]
+six = [0xF0, 0x80, 0xF0, 0x90, 0xF0]
+seven = [0xF0, 0x10, 0x20, 0x40, 0x40]
+eight = [0xF0, 0x90, 0xF0, 0x90, 0xF0]
+nine = [0xF0, 0x90, 0xF0, 0x10, 0xF0]
+a = [0xF0, 0x90, 0xF0, 0x90, 0x90]
+b = [0xE0, 0x90, 0xE0, 0x90, 0xE0]
+c = [0xF0, 0x80, 0x80, 0x80, 0xF0]
+d = [0xE0, 0x90, 0x90, 0x90, 0xE0]
+e = [0xF0, 0x80, 0xF0, 0x80, 0xF0]
+f = [0xF0, 0x80, 0xF0, 0x80, 0x80]
+fonts = [zero,one,two,three,four,five,six,seven,eight,nine,a,b,c,d,e,f]
+
+
+def is_in_range(try_nr, min,max):
+    return try_nr >= min and try_nr <= max
+
 class Memory():
     def __init__(self, ba) -> None:
         self._memory = []
@@ -11,12 +34,15 @@ class Memory():
                 self._memory.append(Ch8Byte(ba[i - 0x200]))
             else:
                 self._memory.append(Ch8Byte(0))
+        font_start_address = 0x50
+        mi = font_start_address
+        for f in fonts:
+            for b in f:
+                self._memory[mi] = Ch8Byte(b)
+                mi += 1
     def try_get_index_memory(self, index, number_of_bytes):
-            try:
-                res = self._memory[index:index + number_of_bytes]
-                return res
-            except:
-                raise Exception(index, "index")
+        res = self._memory[index:index + number_of_bytes]
+        return res
     def try_get_opcode_memory(self,pc):
         try:
             nr = pc.get_word_value()
@@ -36,6 +62,17 @@ class Memory():
             for r in registers:
                 self._memory[index + i] = r
                 i += 1
+            return None
+        except:
+            raise Exception(index, "index")
+    def try_store_bcd(self,index, bcd):
+        try:
+            hundreds = (bcd - (bcd % 100)) / 100
+            tens = ((bcd % 100) - (bcd % 10)) / 10
+            ones = bcd % 10
+            self._memory[index] = Ch8Byte(int(hundreds))
+            self._memory[index + 1] = Ch8Byte(int(tens))
+            self._memory[index + 2] = Ch8Byte(int(ones))
             return None
         except:
             raise Exception(index, "index")

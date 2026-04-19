@@ -305,6 +305,7 @@ class Emulator(ALU):
             instruction, opcode = result
             if DEBUG:
                 print(instruction)
+            print(instruction)
             match instruction:
                 case Instruction.CLEAR: return self.screen.clear()
                 case Instruction.JMP: return self.set_pc(opcode)
@@ -351,10 +352,20 @@ class Emulator(ALU):
         self.stack.append(self.registers["pc"].get_word_value())
         self.registers["pc"] = opcode.get_lower_NNN()
     def setiv(self,opcode):
-        raise Exception("NOT YET IMPLEMENTED")
+        vx = opcode.get_high_byte_lower_nibble()
+        print("reg is", vx)
+        print("type of reg", self.registers["vr"][vx], type(self.registers["vr"][vx]))
+        vreg_x = self.registers["vr"][vx].get_byte_value()
+        self.registers["i"] = Ch8Word().init_word(Ch8Byte(0), Ch8Byte(vreg_x))
     def bcd(self,opcode):
-        raise Exception("NOT YET IMPLEMENTED")
-    def store(self,opcode):
+        if self.memory:
+            vx = opcode.get_high_byte_lower_nibble()
+            vreg_x = self.registers["vr"][vx].get_byte_value()
+            index = self.registers["i"].get_word_value()
+            self.memory.try_store_bcd(index, vreg_x)
+            return None
+        raise Exception("Not initialized")
+    def store(self,_):
         if self.memory:
             index = self.registers["i"].get_word_value()
             self.memory.try_store_registers_memory(index, self.registers["vr"])
@@ -493,6 +504,9 @@ class Emulator(ALU):
         if self.memory:
             self.screen.init_screen()
             while self.run_program:
+                for r in self.registers["vr"]:
+                    if not isinstance(r,Ch8Byte):
+                        raise Exception()
                 opcode = self.get_instruction() # decode opcode/fetch instruction
                 self.increment_pc()
                 self.execute_instruction(opcode) # execute instruction
