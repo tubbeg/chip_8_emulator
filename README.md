@@ -1,7 +1,9 @@
 
 ## CHIP-8 Emulator
 
-<video src="demo.webm.mp4" width="320" height="240" controls></video>
+![demo](./demo.gif)
+
+Zero Demo ROM by zeroZshadow
 
 ### What is this?
 
